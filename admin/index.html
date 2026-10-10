@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src  'self' 'unsafe-inline' https://www.gstatic.com;
+    style-src   'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src    https://fonts.gstatic.com;
+    img-src     'self' data:;
+    connect-src 'self'
+      https://identitytoolkit.googleapis.com
+      https://securetoken.googleapis.com
+      https://firestore.googleapis.com
+      https://*.firebaseio.com;
+  ">
+  <title>Admin Login — Elite Vault</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #060608;
+      --surface: #0f0f12;
+      --border:  rgba(255,255,255,0.07);
+      --primary: #ffd700;
+      --text:    #f0f0f0;
+      --dim:     #666;
+      --error:   #ff4d4d;
+      --r:       14px;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Plus Jakarta Sans", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+    .brand   { font-size: 0.7rem; letter-spacing: 4px; font-weight: 800; color: var(--dim); text-transform: uppercase; margin-bottom: 6px; }
+    .brand span { color: var(--primary); }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+    .sub { font-size: 0.82rem; color: var(--dim); margin-bottom: 32px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 0.67rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: var(--dim); margin-bottom: 8px; }
+    .field input {
+      width: 100%;
+      padding: 13px 15px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus { border-color: var(--primary); }
+    .field input::placeholder { color: var(--dim); }
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      margin-top: 24px;
+      background: var(--primary);
+      color: #000;
+      border: none;
+      border-radius: var(--r);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-login:hover   { opacity: 0.88; transform: translateY(-1px); }
+    .btn-login:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .msg {
+      margin-top: 14px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: none;
+    }
+    .msg.error   { background: rgba(255,77,77,0.08); border: 1px solid rgba(255,77,77,0.25); color: var(--error); display: block; }
+    .msg.warning { background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.2);  color: var(--primary); display: block; }
+    .spin {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="brand">ELITE <span>VAULT</span></p>
+    <h1>Admin Access</h1>
+    <p class="sub">Sign in with your administrator account.</p>
+
+    <div class="field"><label for="em">Email</label><input type="email" id="em" placeholder="admin@example.com" autocomplete="email"></div>
+    <div class="field"><label for="pw">Password</label><input type="password" id="pw" placeholder="••••••••" autocomplete="current-password"></div>
+
+    <button class="btn-login" id="login-btn" type="button">Sign In</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="../assets/js/firebase-config.js"></script>
+  <script>
+  "use strict";
+  var emEl  = document.getElementById("em");
+  var pwEl  = document.getElementById("pw");
+  var btn   = document.getElementById("login-btn");
+  var msgEl = document.getElementById("msg");
+
+  var cfg = window.FIREBASE_CONFIG;
+  if (!cfg || cfg.apiKey === "YOUR_API_KEY") {
+    msgEl.className = "msg warning";
+    msgEl.textContent = "Firebase not configured. Edit assets/js/firebase-config.js with your project credentials.";
+    btn.disabled = true;
+  } else {
+    try { firebase.initializeApp(cfg); } catch(e) { if (e.code !== "app/duplicate-app") throw e; }
+
+    firebase.auth().onAuthStateChanged(function(user) {
+      if (!user) return;
+      /* ── SECURITY: redirect admins to dashboard.
+         ADVANCED MODE: Custom Claim { admin: true } — original path.
+         BASIC MODE:    Firestore admins/{uid} document — Security Manager.
+         BOOTSTRAP:     system/security not yet written — redirect for first-time setup. ── */
+      user.getIdTokenResult(/* forceRefresh= */ true).then(function(result) {
+        if (result.claims.admin === true) {
+          window.location.replace("./dashboard.html");
+          return;
+        }
+        var fdb = firebase.firestore();
+        fdb.collection("admins").doc(user.uid).get().then(function(doc) {
+          if (doc.exists) {
+            window.location.replace("./dashboard.html");
+          } else {
+            fdb.collection("system").doc("security").get().then(function(secDoc) {
+              if (!secDoc.exists) {
+                /* System not yet initialized — go to dashboard for first-time setup wizard */
+                window.location.replace("./dashboard.html");
+              } else {
+                /* Fully initialized but this account is not an admin */
+                firebase.auth().signOut();
+              }
+            }).catch(function() { firebase.auth().signOut(); });
+          }
+        }).catch(function() { firebase.auth().signOut(); });
+      }).catch(function() { firebase.auth().signOut(); });
+    });
+
+    btn.addEventListener("click", doLogin);
+    [emEl, pwEl].forEach(function(el) {
+      el.addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
+    });
+  }
+
+  function doLogin() {
+    msgEl.className = "msg";
+    var email = emEl.value.trim();
+    var pass  = pwEl.value;
+    if (!email || !pass) { showMsg("Enter email and password.", "error"); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span>Signing in…';
+
+    firebase.auth().signInWithEmailAndPassword(email, pass)
+      .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = "Sign In";
+        var map = {
+          "auth/user-not-found":    "No account found.",
+          "auth/wrong-password":    "Incorrect password.",
+          "auth/invalid-email":     "Invalid email.",
+          "auth/too-many-requests": "Too many attempts. Try later.",
+          "auth/invalid-credential":"Invalid credentials.",
+        };
+        showMsg(map[e.code] || "Sign in failed.", "error");
+      });
+  }
+
+  function showMsg(text, type) {
+    msgEl.className = "msg " + type;
+    msgEl.textContent = text;
+  }
+  </script>
+</body>
+</html>
