@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src  'self' 'unsafe-inline' https://www.gstatic.com;
+    style-src   'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src    https://fonts.gstatic.com;
+    img-src     'self' data: https:;
+    connect-src 'self'
+      https://identitytoolkit.googleapis.com
+      https://securetoken.googleapis.com
+      https://firestore.googleapis.com
+      https://*.firebaseio.com
+      https://storage.googleapis.com
+      https://*.cloudfunctions.net;
+  ">
+  <title>Dashboard — Elite Vault Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #060608; --surface: #0f0f12; --surface2: #16161b;
+      --border: rgba(255,255,255,0.07); --primary: #ffd700;
+      --pdim: rgba(255,215,0,0.12); --text: #f0f0f0;
+      --dim: #666; --dim2: #444; --error: #ff4d4d;
+      --ok: #22c55e; --r: 14px; --rl: 22px;
+      --sw: 240px; --hh: 58px;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Plus Jakarta Sans",sans-serif; font-size:0.9rem; line-height:1.5; min-height:100vh; }
+    button { font-family:inherit; cursor:pointer; }
+    input, textarea, select { font-family:inherit; }
+    a { color:inherit; text-decoration:none; }
+
+    /* AUTH GUARD */
+    #auth-guard { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:9999; font-size:0.85rem; color:var(--dim); }
+    #app { display:none; }
+
+    /* LAYOUT */
+    .layout { display:flex; min-height:100vh; }
+    .sidebar { width:var(--sw); background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; height:100vh; z-index:100; }
+    .sb-brand { padding:22px 20px 18px; border-bottom:1px solid var(--border); }
+    .sb-brand .mark { font-size:0.68rem; letter-spacing:3px; font-weight:800; text-transform:uppercase; color:var(--dim); }
+    .sb-brand .mark span { color:var(--primary); }
+    .sb-brand .sub { font-size:0.72rem; color:var(--dim); margin-top:2px; }
+    .sb-nav { flex:1; overflow-y:auto; padding:14px 12px; }
+    .nav-lbl { font-size:0.62rem; letter-spacing:2px; text-transform:uppercase; color:var(--dim2); padding:10px 8px 6px; font-weight:700; }
+    .nav-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; color:var(--dim); font-weight:600; font-size:0.85rem; cursor:pointer; transition:background 0.15s,color 0.15s; border:none; background:none; width:100%; text-align:left; }
+    .nav-btn:hover { background:var(--surface2); color:var(--text); }
+    .nav-btn.active { background:var(--pdim); color:var(--primary); }
+    .sb-foot { padding:14px 12px; border-top:1px solid var(--border); }
+    .btn-out { display:flex; align-items:center; gap:8px; width:100%; padding:10px 12px; border-radius:10px; border:none; background:none; color:var(--dim); font-size:0.82rem; font-weight:600; cursor:pointer; transition:color 0.15s,background 0.15s; }
+    .btn-out:hover { color:var(--error); background:rgba(255,77,77,0.07); }
+    .main { flex:1; margin-left:var(--sw); display:flex; flex-direction:column; min-height:100vh; }
+    .topbar { height:var(--hh); background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 28px; position:sticky; top:0; z-index:50; }
+    .topbar-title { font-size:1rem; font-weight:700; }
+    .topbar-user { font-size:0.78rem; color:var(--dim); }
+    .content { padding:28px; flex:1; }
+
+    /* PANELS */
+    .panel { display:none; } .panel.active { display:block; }
+    .ph { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+    .pt { font-size:1.3rem; font-weight:800; letter-spacing:-0.3px; }
+    .ps { font-size:0.78rem; color:var(--dim); margin-top:2px; }
+
+    /* CARDS */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:24px; margin-bottom:20px; }
+    .card-title { font-size:0.8rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); margin-bottom:16px; }
+
+    /* STATS */
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:24px; }
+    .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:20px 22px; }
+    .stat-l { font-size:0.72rem; color:var(--dim); font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+    .stat-v { font-size:2rem; font-weight:800; margin-top:6px; letter-spacing:-1px; }
+    .stat-v.g { color:var(--primary); }
+
+    /* TABLE */
+    .tbl { width:100%; border-collapse:collapse; }
+    .tbl th { text-align:left; font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); font-weight:700; padding:10px 14px; border-bottom:1px solid var(--border); }
+    .tbl td { padding:12px 14px; border-bottom:1px solid var(--border); font-size:0.85rem; vertical-align:middle; }
+    .tbl tr:last-child td { border-bottom:none; }
+    .tbl tr:hover td { background:var(--surface2); }
+    .acts { display:flex; gap:8px; }
+
+    /* BUTTONS */
+    .btn { padding:9px 18px; border-radius:10px; font-size:0.8rem; font-weight:700; border:none; cursor:pointer; transition:opacity 0.15s,transform 0.15s; }
+    .btn:hover { opacity:0.85; transform:translateY(-1px); }
+    .btn:active { transform:translateY(0); }
+    .btn-p { background:var(--primary); color:#000; }
+    .btn-o { background:none; border:1px solid var(--border); color:var(--text); }
+    .btn-d { background:rgba(255,77,77,0.12); color:var(--error); border:1px solid rgba(255,77,77,0.2); }
+    .btn-sm { padding:6px 12px; font-size:0.75rem; }
+
+    /* FORMS */
+    .fg { margin-bottom:18px; }
+    .fg label { display:block; font-size:0.68rem; letter-spacing:1.8px; text-transform:uppercase; font-weight:700; color:var(--dim); margin-bottom:8px; }
+    .fg input, .fg textarea, .fg select { width:100%; padding:12px 14px; background:var(--bg); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-size:0.88rem; outline:none; transition:border-color 0.2s,box-shadow 0.2s; }
+    .fg input:focus, .fg textarea:focus, .fg select:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(255,215,0,0.07); }
+    .fg textarea { min-height:90px; resize:vertical; line-height:1.5; }
+    .fg select option { background:#111; }
+    .fr { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:600px) { .fr { grid-template-columns:1fr; } }
+
+    /* MODAL OVERLAY */
+    .mo { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; z-index:1000; padding:20px; }
+    .mo.open { display:flex; }
+    .mb { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:32px 28px; width:100%; max-width:520px; max-height:88vh; overflow-y:auto; }
+    .mh { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .mt { font-size:1.1rem; font-weight:800; }
+    .mc { background:none; border:none; color:var(--dim); font-size:1.2rem; cursor:pointer; padding:4px 8px; }
+    .mc:hover { color:var(--text); }
+    .ma { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
+
+    /* TOAST */
+    #toast { position:fixed; bottom:28px; right:28px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:12px 18px; font-size:0.82rem; font-weight:600; z-index:9999; opacity:0; transform:translateY(10px); transition:opacity 0.25s,transform 0.25s; pointer-events:none; max-width:300px; }
+    #toast.show { opacity:1; transform:translateY(0); }
+    #toast.ok  { border-color:rgba(34,197,94,0.3); color:var(--ok); }
+    #toast.err { border-color:rgba(255,77,77,0.3); color:var(--error); }
+
+    /* EMPTY STATE */
+    .empty { text-align:center; padding:48px 20px; color:var(--dim); }
+    .empty-i { font-size:2.5rem; margin-bottom:12px; opacity:0.5; }
+
+    /* SPINNER */
+    .spin { display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,0.15); border-top-color:var(--primary); border-radius:50%; animation:sp 0.7s linear infinite; vertical-align:middle; }
+    @keyframes sp { to { transform:rotate(360deg); } }
+
+    /* MOBILE */
+    .sb-toggle { display:none; background:none; border:none; color:var(--text); font-size:1.3rem; cursor:pointer; }
+    @media(max-width:768px) { .sidebar { transform:translateX(-100%); transition:transform 0.25s; } .sidebar.open { transform:translateX(0); } .main { margin-left:0; } .sb-toggle { display:block; } .content { padding:18px; } }
+
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.7rem; font-weight:700; text-transform:uppercase; }
+    .bg-g { background:var(--pdim); color:var(--primary); }
+  </style>
+</head>
+<body>
+
+<div id="auth-guard"><span class="spin" style="width:18px;height:18px;border-top-color:var(--primary);"></span>&nbsp;Verifying…</div>
+
+<div id="app">
+ <div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sb">
+   <div class="sb-brand">
+    <div class="mark">ELITE <span>VAULT</span></div>
+    <div class="sub">Admin Dashboard</div>
+   </div>
+   <nav class="sb-nav">
+    <div class="nav-lbl">Content</div>
+    <button class="nav-btn active" data-panel="dashboard"><span>⬡</span> Dashboard</button>
+    <button class="nav-btn" data-panel="products"><span>📦</span> Products</button>
+    <button class="nav-btn" data-panel="about"><span>✦</span> About</button>
+    <button class="nav-btn" data-panel="faq"><span>◎</span> FAQ</button>
+    <div class="nav-lbl" style="margin-top:10px;">Config</div>
+    <button class="nav-btn" data-panel="payments"><span>⬡</span> Payments</button>
+    <button class="nav-btn" data-panel="contact"><span>✉</span> Contact</button>
+    <button class="nav-btn" data-panel="settings"><span>⚙</span> Settings</button>
+    <button class="nav-btn" data-panel="security"><span>🔐</span> Security</button>
+    <div class="nav-lbl" style="margin-top:10px;">Sections</div>
+    <button class="nav-btn" data-panel="gallery"><span>&#128444;</span> Gallery</button>
+   </nav>
+   <div class="sb-foot">
+    <button class="btn-out" id="logout-btn">↩ Sign Out</button>
+   </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+   <div class="topbar">
+    <div style="display:flex;align-items:center;gap:14px;">
+     <button class="sb-toggle" id="sb-toggle">☰</button>
+     <span class="topbar-title" id="topbar-title">Dashboard</span>
+    </div>
+    <span class="topbar-user" id="user-em"></span>
+   </div>
+
+   <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="panel active" id="panel-dashboard">
+     <div class="ph">
+      <div><div class="pt">Overview</div><div class="ps">Elite Vault CMS</div></div>
+      <a href="../index.html" target="_blank" class="btn btn-o btn-sm">↗ View Site</a>
+     </div>
+     <div class="stats">
+      <div class="stat"><div class="stat-l">Products</div><div class="stat-v g" id="s-products">—</div></div>
+      <div class="stat"><div class="stat-l">FAQ Entries</div><div class="stat-v" id="s-faq">—</div></div>
+      <div class="stat"><div class="stat-l">Payment Methods</div><div class="stat-v" id="s-payments">—</div></div>
+     </div>
+     <div class="card">
+      <div class="card-title">Quick Actions</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+       <button class="btn btn-p" onclick="sw('products')">Manage Products</button>
+       <button class="btn btn-o" onclick="sw('faq')">Edit FAQ</button>
+       <button class="btn btn-o" onclick="sw('settings')">Settings</button>
+      </div>
+     </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="panel" id="panel-products">
+     <div class="ph">
+      <div><div class="pt">Products</div><div class="ps">Manage vault listings</div></div>
+      <button class="btn btn-p btn-sm" onclick="openProd()">+ Add Product</button>
+     </div>
+     <div class="card" style="overflow:auto;">
+      <table class="tbl">
+       <thead><tr><th>Name</th><th>Price</th><th>Description</th><th>Order</th><th>Actions</th></tr></thead>
+       <tbody id="prod-tb"><tr><td colspan="5"><div class="empty"><div class="empty-i">◌</div>Loading…</div></td></tr></tbody>
+      </table>
+     </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div class="panel" id="panel-about">
+     <div class="ph">
+      <div><div class="pt">About</div><div class="ps">Edit about section</div></div>
+      <button class="btn btn-p btn-sm" onclick="saveAbout()">Save Changes</button>
+     </div>
+     <div class="card"><div class="card-title">Section Title</div>
+      <div class="fg"><label>About Section Heading</label><input id="a-stitle" type="text" placeholder="The Architecture of Absolute Precision"></div>
+      <div class="fg"><label>About Subtitle</label><input id="a-ssub" type="text" placeholder="VALIDATED CORE & EMPIRICAL PERFORMANCE"></div>
+     </div>
+     <div class="card"><div class="card-title">Card 1</div>
+      <div class="fg"><label>Title</label><input id="a1t" type="text"></div>
+      <div class="fg"><label>Body</label><textarea id="a1b"></textarea></div>
+     </div>
+     <div class="card"><div class="card-title">Card 2</div>
+      <div class="fg"><label>Title</label><input id="a2t" type="text"></div>
+      <div class="fg"><label>Body</label><textarea id="a2b"></textarea></div>
+     </div>
+     <div class="card"><div class="card-title">Card 3</div>
+      <div class="fg"><label>Title</label><input id="a3t" type="text"></div>
+      <div class="fg"><label>Body</label><textarea id="a3b"></textarea></div>
+     </div>
+     <div class="card"><div class="card-title">Card 4</div>
+      <div class="fg"><label>Title</label><input id="a4t" type="text"></div>
+      <div class="fg"><label>Body</label><textarea id="a4b"></textarea></div>
+     </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="panel" id="panel-faq">
+     <div class="ph">
+      <div><div class="pt">FAQ</div><div class="ps">Knowledge base</div></div>
+      <button class="btn btn-p btn-sm" onclick="openFAQ()">+ Add Entry</button>
+     </div>
+     <div class="card" style="overflow:auto;">
+      <table class="tbl">
+       <thead><tr><th>Question</th><th>Answer (preview)</th><th>Order</th><th>Actions</th></tr></thead>
+       <tbody id="faq-tb"><tr><td colspan="4"><div class="empty"><div class="empty-i">◌</div>Loading…</div></td></tr></tbody>
+      </table>
+     </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div class="panel" id="panel-payments">
+     <div class="ph">
+      <div><div class="pt">Payments</div><div class="ps">Manage payment methods shown to buyers</div></div>
+      <button class="btn btn-p btn-sm" onclick="openPMForm(null)">+ Add Method</button>
+     </div>
+     <div class="card" style="padding:0;overflow:hidden;">
+      <table class="tbl" id="pm-table">
+       <thead><tr><th>Method</th><th>Category</th><th>Type</th><th>Status</th><th></th></tr></thead>
+       <tbody id="pm-tbody"></tbody>
+      </table>
+      <div class="empty" id="pm-empty" style="display:none;"><div class="empty-i">⬡</div><p>No payment methods yet. Click + Add Method to get started.</p></div>
+     </div>
+    </div>
+
+    <!-- CONTACT -->
+    <div class="panel" id="panel-contact">
+     <div class="ph">
+      <div><div class="pt">Contact</div><div class="ps">Communication details</div></div>
+      <button class="btn btn-p btn-sm" onclick="saveContact()">Save Changes</button>
+     </div>
+     <div class="card">
+      <div class="fg"><label>Primary Email (BUY inquiry)</label><input id="c-email" type="email"></div>
+      <div class="fg"><label>Instagram URL</label><input id="c-ig" type="url" placeholder="https://instagram.com/..."></div>
+      <div class="fg"><label>Twitter / X URL</label><input id="c-tw" type="url" placeholder="https://x.com/..."></div>
+      <div class="fg"><label>LinkedIn URL</label><input id="c-li" type="url" placeholder="https://linkedin.com/in/..."></div>
+     </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="panel" id="panel-settings">
+     <div class="ph">
+      <div><div class="pt">Settings</div><div class="ps">Site identity and SEO</div></div>
+      <button class="btn btn-p btn-sm" onclick="saveSettings()">Save All</button>
+     </div>
+     <div class="card">
+      <div class="card-title">Site Identity</div>
+      <div class="fr">
+       <div class="fg"><label>Website Name</label><input id="s-name" type="text" placeholder="Elite Vault"></div>
+       <div class="fg"><label>Website Email</label><input id="s-email" type="email"></div>
+      </div>
+      <div class="fg"><label>Logo URL (leave blank for text logo)</label><input id="s-logo" type="url" placeholder="https://…/logo.png"></div>
+      <div class="fg"><label>Favicon URL</label><input id="s-fav" type="url" placeholder="https://…/favicon.ico"></div>
+      <div class="fg"><label>Tagline (hero typewriter)</label><input id="s-tag" type="text" placeholder="Architecting Digital Sovereignty."></div>
+      <div class="fg"><label>Hero Description</label><input id="s-hero-desc" type="text" placeholder="Industrial-grade software assets designed for absolute performance."></div>
+      <div class="fg"><label>FAQ Section Heading</label><input id="s-faqt" type="text" placeholder="Knowledge Base"></div>
+      <div class="fg"><label>FAQ Subtitle</label><input id="s-faqsub" type="text" placeholder="ACQUISITION PROTOCOLS & INTEL"></div>
+      <div class="fg"><label>Repository Title</label><input id="s-vault-title" type="text" placeholder="The Repository"></div>
+      <div class="fg"><label>Repository Subtitle</label><input id="s-vault-sub" type="text" placeholder="CURATED ASSETS — DIGITAL MARKET"></div>
+     </div>
+     <div class="card">
+      <div class="card-title">SEO</div>
+      <div class="fg"><label>SEO Title</label><input id="s-seot" type="text" placeholder="Elite Vault v8.2.9 — Digital Market"></div>
+      <div class="fg"><label>SEO Description</label><textarea id="s-seod" style="min-height:70px;"></textarea></div>
+     </div>
+     <div class="card">
+      <div class="card-title">Footer</div>
+      <div class="fg"><label>Footer / Copyright Text</label><input id="s-foot" type="text" placeholder="© 2026 ELITE VAULT — ALL RIGHTS RESERVED"></div>
+      <div class="fg"><label>Social Section Label</label><input id="s-fsl" type="text" placeholder="OFFICIAL CHANNELS"></div>
+      <div class="fg"><label>Social Section Title</label><input id="s-fst" type="text" placeholder="Connect With Elite Vault"></div>
+      <div class="fg"><label>Social Section Description</label><input id="s-fsd" type="text" placeholder="Follow our official platforms for updates, announcements, and future releases."></div>
+     </div>
+     <div class="card">
+      <div class="card-title">Social Media</div>
+      <div class="fg"><label>Instagram URL</label><input id="s-ig" type="url" placeholder="https://instagram.com/..."></div>
+      <div class="fg"><label>Twitter / X URL</label><input id="s-tw" type="url" placeholder="https://x.com/..."></div>
+      <div class="fg"><label>LinkedIn URL</label><input id="s-li" type="url" placeholder="https://linkedin.com/in/..."></div>
+     </div>
+     <div class="card">
+      <div class="card-title">Website Background</div>
+      <div class="fg"><label>Background Image URL (optional)</label><input id="s-bg-img" type="url" placeholder="https://…/background.jpg"></div>
+      <div class="fg"><label>Background Video URL (optional)</label><input id="s-bg-vid" type="url" placeholder="https://…/background.mp4"></div>
+      <small style="display:block;margin-top:6px;opacity:.55;font-size:11px;">Video has priority over image. Leave both empty to keep the default dark background.</small>
+     </div>
+     <div class="card">
+      <div class="card-title">Showcase Section</div>
+      <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="s-sc-enabled" style="width:auto;margin-bottom:0;"> Enable Showcase Section</label></div>
+      <div class="fg"><label>Showcase Eyebrow Label</label><input id="s-sc-eyebrow" type="text" placeholder="FEATURED COLLECTION"></div>
+      <div class="fg"><label>Showcase Title</label><input id="s-sc-title" type="text" placeholder="Engineered for Excellence"></div>
+      <div class="fg"><label>Showcase Subtitle</label><input id="s-sc-sub" type="text" placeholder="Industrial-grade digital assets crafted for absolute performance."></div>
+      <div class="fg"><label>Showcase Background Image URL (optional)</label><input id="s-sc-img" type="url" placeholder="https://…/showcase-bg.jpg"></div>
+      <div class="fg"><label>Showcase Background Video URL (optional)</label><input id="s-sc-vid" type="url" placeholder="https://…/showcase-bg.mp4"></div>
+      <small style="display:block;margin-top:6px;opacity:.55;font-size:11px;">Video has priority over image. Leave both empty for the default gradient. This background is independent from the Hero background.</small>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:22px 0 18px;">
+      <div class="card-title" style="font-size:0.78rem;letter-spacing:2px;opacity:0.5;margin-bottom:16px;padding:0;">SHOWCASE CARDS</div>
+      <div style="font-size:0.72rem;font-weight:800;letter-spacing:1.5px;opacity:0.4;margin-bottom:10px;">CARD 1</div>
+      <div class="fg"><label>Card 1 — Image URL (optional)</label><input id="s-sc-c1-img" type="url" placeholder="https://…/card1.jpg"></div>
+      <div class="fg"><label>Card 1 — Title</label><input id="s-sc-c1-title" type="text" placeholder="Zero Latency"></div>
+      <div class="fg"><label>Card 1 — Description</label><input id="s-sc-c1-body" type="text" placeholder="Performance optimized at every architectural layer"></div>
+      <div style="font-size:0.72rem;font-weight:800;letter-spacing:1.5px;opacity:0.4;margin:14px 0 10px;">CARD 2</div>
+      <div class="fg"><label>Card 2 — Image URL (optional)</label><input id="s-sc-c2-img" type="url" placeholder="https://…/card2.jpg"></div>
+      <div class="fg"><label>Card 2 — Title</label><input id="s-sc-c2-title" type="text" placeholder="Secure by Default"></div>
+      <div class="fg"><label>Card 2 — Description</label><input id="s-sc-c2-body" type="text" placeholder="Enterprise-grade security embedded from the ground up"></div>
+      <div style="font-size:0.72rem;font-weight:800;letter-spacing:1.5px;opacity:0.4;margin:14px 0 10px;">CARD 3</div>
+      <div class="fg"><label>Card 3 — Image URL (optional)</label><input id="s-sc-c3-img" type="url" placeholder="https://…/card3.jpg"></div>
+      <div class="fg"><label>Card 3 — Title</label><input id="s-sc-c3-title" type="text" placeholder="Infinite Scale"></div>
+      <div class="fg"><label>Card 3 — Description</label><input id="s-sc-c3-body" type="text" placeholder="Architecture ready for any operational load"></div>
+      <small style="display:block;margin-top:8px;opacity:.55;font-size:11px;">Leave Image URL empty to keep the default icon fallback for that card.</small>
+     </div>
+     <div class="card">
+      <div class="card-title">Gallery Section Text</div>
+      <div class="fg"><label>Gallery Eyebrow Label</label><input id="s-gl-eyebrow" type="text" placeholder="VISUAL ARCHIVE"></div>
+      <div class="fg"><label>Gallery Heading</label><input id="s-gl-heading" type="text" placeholder="Product Gallery"></div>
+      <div class="fg"><label>Gallery Subtitle</label><input id="s-gl-sub" type="text" placeholder="Explore our curated digital asset collection"></div>
+     </div>
+    </div>
+
+    <!-- SECURITY -->
+    <div class="panel" id="panel-security">
+     <div class="ph">
+      <div><div class="pt">Security Manager</div><div class="ps">Admin access &amp; authentication mode</div></div>
+     </div>
+
+     <!-- BOOTSTRAP: visible only before system/security is initialized -->
+     <div id="sec-bootstrap" style="display:none;">
+      <div class="card" style="border-color:rgba(255,215,0,0.3);">
+       <div class="card-title" style="color:var(--primary);">⚡ First Time Setup</div>
+       <p style="font-size:0.85rem;color:var(--dim);margin-bottom:8px;line-height:1.65;">
+        No admin account has been configured yet. Click below to grant administrator
+        access to your currently logged-in account:
+       </p>
+       <p id="sec-boot-email" style="font-size:0.88rem;font-weight:700;margin-bottom:18px;color:var(--text);"></p>
+       <p style="font-size:0.78rem;color:var(--dim);margin-bottom:20px;line-height:1.6;">
+        This creates an admin record in Basic Mode — no Firebase CLI or terminal required.
+        You can add more admins and optionally enable Advanced Mode (Custom Claims) from
+        this panel after setup.
+       </p>
+       <button class="btn btn-p" onclick="secBootstrap(this)">Initialize Admin Access</button>
+      </div>
+     </div>
+
+     <!-- MAIN: visible after initialization -->
+     <div id="sec-main" style="display:none;">
+
+      <!-- Mode Card -->
+      <div class="card">
+       <div class="card-title">Authentication Mode</div>
+       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="flex:1;min-width:200px;">
+         <div id="sec-mode-badge" style="margin-bottom:12px;"></div>
+         <div id="sec-mode-desc" style="font-size:0.82rem;color:var(--dim);line-height:1.65;"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-direction:column;min-width:190px;">
+         <button class="btn btn-p" id="sec-btn-adv"   onclick="secSetMode('advanced')" style="display:none;">Enable Advanced Mode</button>
+         <button class="btn btn-o" id="sec-btn-basic" onclick="secSetMode('basic')"    style="display:none;">Switch to Basic Mode</button>
+        </div>
+       </div>
+       <div id="sec-adv-info" style="display:none;margin-top:16px;padding:14px;background:var(--bg);border-radius:10px;font-size:0.8rem;color:var(--dim);line-height:1.65;border:1px solid var(--border);"></div>
+      </div>
+
+      <!-- Current Account Card -->
+      <div class="card">
+       <div class="card-title">Your Account</div>
+       <div class="fr">
+        <div>
+         <label style="display:block;font-size:0.68rem;letter-spacing:1.8px;text-transform:uppercase;font-weight:700;color:var(--dim);margin-bottom:8px;">User ID (UID)</label>
+         <code id="sec-uid" style="font-size:0.78rem;background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--border);display:block;word-break:break-all;line-height:1.6;"></code>
+        </div>
+        <div>
+         <label style="display:block;font-size:0.68rem;letter-spacing:1.8px;text-transform:uppercase;font-weight:700;color:var(--dim);margin-bottom:8px;">Email</label>
+         <code id="sec-email-disp" style="font-size:0.78rem;background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--border);display:block;"></code>
+        </div>
+       </div>
+       <p style="margin-top:12px;font-size:0.75rem;color:var(--dim);">
+        Share your UID with a co-admin so they can grant you access to a different installation,
+        or use it when adding admins below.
+       </p>
+      </div>
+
+      <!-- Admin Management Card -->
+      <div class="card">
+       <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <span>Admin Accounts</span>
+        <button class="btn btn-p btn-sm" onclick="openAddAdmin()">+ Add Admin</button>
+       </div>
+       <div style="overflow:auto;">
+        <table class="tbl">
+         <thead>
+          <tr><th>UID</th><th>Label / Email</th><th>Added</th><th>Actions</th></tr>
+         </thead>
+         <tbody id="admin-tb">
+          <tr><td colspan="4"><div class="empty"><div class="empty-i">◌</div>Loading…</div></td></tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+
+     </div><!-- /sec-main -->
+    </div><!-- /panel-security -->
+
+    <!-- GALLERY -->
+    <div class="panel" id="panel-gallery">
+     <div class="ph">
+      <div><div class="pt">Gallery</div><div class="ps">Manage product showcase images — displayed as 3D coverflow on the home page</div></div>
+      <button class="btn btn-p btn-sm" onclick="openGalleryItem()">+ Add Image</button>
+     </div>
+     <div class="card" style="overflow:auto;">
+      <table class="tbl">
+       <thead><tr><th style="width:76px;">Preview</th><th>Caption / Alt</th><th>Order</th><th>Actions</th></tr></thead>
+       <tbody id="gallery-tb"><tr><td colspan="4"><div class="empty"><div class="empty-i">&#9900;</div>Loading…</div></td></tr></tbody>
+      </table>
+     </div>
+    </div>
+
+   </div><!-- /content -->
+  </div><!-- /main -->
+ </div><!-- /layout -->
+</div><!-- /app -->
+
+<!-- Product Modal -->
+<div class="mo" id="prod-modal">
+ <div class="mb">
+  <div class="mh"><div class="mt" id="pm-title">Add Product</div><button class="mc" onclick="closeProd()">✕</button></div>
+  <input type="hidden" id="pm-id">
+  <div class="fr">
+   <div class="fg"><label>Name</label><input id="pm-name" type="text" placeholder="Titan Core"></div>
+   <div class="fg"><label>Price</label><input id="pm-price" type="text" placeholder="$1,290"></div>
+  </div>
+  <div class="fg"><label>Short Description</label><input id="pm-desc" type="text"></div>
+  <div class="fg"><label>Image URL / Path</label><input id="pm-img" type="text" placeholder="assets/img/Titan%20Core.webp"></div>
+  <div class="fg"><label>Display Order</label><input id="pm-ord" type="number" min="0" value="0"></div>
+  <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:4px;">
+   <div class="card-title" style="margin-bottom:14px;">Download File</div>
+   <div class="fg"><label>Storage Path<span style="font-weight:400;font-size:.78rem;color:#888;margin-left:6px;">(gs:// atau relative path &mdash; bukan https://)</span></label><input id="pm-dl-url" type="text" placeholder="products/titan-core.zip"></div>
+   <small style="display:block;margin-top:-10px;margin-bottom:14px;opacity:.5;font-size:11px;">Biarkan kosong jika file belum disiapkan. Jangan gunakan https:// &mdash; gunakan relative path atau gs://bucket/path.</small>
+  </div>
+  <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:4px;">
+   <div class="card-title" style="margin-bottom:14px;">Modal Content</div>
+   <div class="fg"><label>Headline</label><input id="pm-hl" type="text"></div>
+   <div class="fg"><label>Body</label><textarea id="pm-body"></textarea></div>
+   <div class="fg"><label>Features (one per line)</label><textarea id="pm-feat" style="min-height:90px;"></textarea></div>
+  </div>
+  <div class="ma">
+   <button class="btn btn-o" onclick="closeProd()">Cancel</button>
+   <button class="btn btn-p" id="pm-save" onclick="saveProd()">Save Product</button>
+  </div>
+ </div>
+</div>
+
+<!-- FAQ Modal -->
+<div class="mo" id="faq-modal">
+ <div class="mb">
+  <div class="mh"><div class="mt" id="fm-title">Add FAQ</div><button class="mc" onclick="closeFAQ()">✕</button></div>
+  <input type="hidden" id="fm-id">
+  <div class="fg"><label>Question</label><input id="fm-q" type="text"></div>
+  <div class="fg"><label>Answer</label><textarea id="fm-a" style="min-height:100px;"></textarea></div>
+  <div class="fg"><label>Display Order</label><input id="fm-ord" type="number" min="0" value="0"></div>
+  <div class="fg">
+   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+    <input type="checkbox" id="fm-el" style="width:auto;">
+    Append operator email link to answer
+   </label>
+  </div>
+  <div class="ma">
+   <button class="btn btn-o" onclick="closeFAQ()">Cancel</button>
+   <button class="btn btn-p" id="fm-save" onclick="saveFAQEntry()">Save Entry</button>
+  </div>
+ </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Payment Method Modal -->
+<div class="mo" id="pf-modal">
+ <div class="mb" style="max-width:540px;">
+  <div class="mh">
+   <div class="mt" id="pf-modal-title">Add Payment Method</div>
+   <button class="mc" onclick="closePMForm()">✕</button>
+  </div>
+  <input type="hidden" id="pf-id">
+  <div class="fg"><label>Display Name</label><input id="pf-name" type="text" placeholder="e.g. Bank Central Asia"></div>
+  <div class="fr">
+   <div class="fg"><label>Category</label>
+    <select id="pf-cat">
+     <option value="local">Bank Lokal</option>
+     <option value="intl">International</option>
+     <option value="ewallet">E-Wallet / Digital</option>
+    </select>
+   </div>
+   <div class="fg"><label>Payment Type</label>
+    <select id="pf-type" onchange="renderPFDynamic()">
+     <option value="bank">Bank Transfer</option>
+     <option value="paypal">PayPal</option>
+     <option value="qris">QRIS</option>
+     <option value="barcode">Barcode</option>
+     <option value="dana">Dana</option>
+     <option value="ovo">OVO</option>
+     <option value="gopay">GoPay</option>
+     <option value="shopeepay">ShopeePay</option>
+     <option value="linkaja">LinkAja</option>
+     <option value="wise">Wise</option>
+     <option value="payoneer">Payoneer</option>
+     <option value="stripe">Stripe Payment Link</option>
+     <option value="custom">Custom</option>
+    </select>
+   </div>
+  </div>
+  <div id="pf-dynamic"></div>
+  <div class="fg">
+   <label>Payment Mode</label>
+   <div style="display:flex;gap:24px;align-items:center;padding:5px 0;">
+    <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer;"><input type="radio" name="pf-mode" id="pf-mode-manual" value="manual" onchange="renderPFMode()" checked> Manual</label>
+    <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer;"><input type="radio" name="pf-mode" id="pf-mode-auto" value="automatic" onchange="renderPFMode()"> Automatic</label>
+   </div>
+  </div>
+  <div id="pf-gateway-block" style="display:none;">
+   <div class="fg"><label>Payment Gateway</label>
+    <select id="pf-gateway">
+     <option value="">— Select Gateway —</option>
+     <option value="midtrans">Midtrans</option>
+     <option value="stripe">Stripe</option>
+     <option value="paypal">PayPal Checkout</option>
+     <option value="xendit">Xendit</option>
+     <option value="custom">Custom Gateway</option>
+    </select>
+   </div>
+   <div class="fg"><label>Gateway Endpoint URL <span style="font-weight:400;font-size:.78rem;color:#888;">(Cloud Function URL — secrets stay server-side)</span></label>
+    <input id="pf-gateway-url" type="url" placeholder="https://us-central1-project.cloudfunctions.net/createPayment">
+   </div>
+  </div>
+  <div class="fr">
+   <div class="fg"><label>Sort Order</label><input id="pf-order" type="number" min="0" value="0"></div>
+   <div class="fg"><label>Status</label>
+    <select id="pf-active">
+     <option value="true">Active</option>
+     <option value="false">Inactive</option>
+    </select>
+   </div>
+  </div>
+  <div class="ma">
+   <button class="btn btn-o" onclick="closePMForm()">Cancel</button>
+   <button class="btn btn-p" onclick="savePMMethod()">Save Method</button>
+  </div>
+ </div>
+</div>
+
+<!-- Gallery Item Modal -->
+<div class="mo" id="gallery-modal">
+ <div class="mb">
+  <div class="mh"><div class="mt" id="gm-title">Add Image</div><button class="mc" onclick="closeGalleryItem()">✕</button></div>
+  <input type="hidden" id="gm-id">
+  <div class="fg"><label>Image URL (https://)</label><input id="gm-url" type="url" placeholder="https://…/image.jpg"></div>
+  <div class="fg"><label>Caption / Alt Text (optional)</label><input id="gm-alt" type="text" placeholder="Product showcase image"></div>
+  <div class="fg"><label>Display Order</label><input id="gm-ord" type="number" min="0" value="0"></div>
+  <div class="ma">
+   <button class="btn btn-o" onclick="closeGalleryItem()">Cancel</button>
+   <button class="btn btn-p" id="gm-save" onclick="saveGalleryItem()">Save Image</button>
+  </div>
+ </div>
+</div>
+
+<!-- Add Admin Modal -->
+<div class="mo" id="addadmin-modal">
+ <div class="mb" style="max-width:460px;">
+  <div class="mh"><div class="mt">Add Administrator</div><button class="mc" onclick="closeAddAdmin()">✕</button></div>
+  <div class="fg">
+   <label>User UID</label>
+   <input id="aa-uid" type="text" placeholder="Paste the user's Firebase UID here">
+  </div>
+  <div class="fg">
+   <label>Display Label <span style="font-weight:400;color:var(--dim);">(optional)</span></label>
+   <input id="aa-label" type="text" placeholder="e.g. John Doe — john@example.com">
+  </div>
+  <p style="font-size:0.75rem;color:var(--dim);line-height:1.65;margin-bottom:6px;">
+   The user must first create a Firebase Authentication account (Email/Password).
+   Their UID is shown in Firebase Console → Authentication → Users,
+   or the user can find their own UID in Dashboard → Security → Your Account.
+  </p>
+  <div class="ma">
+   <button class="btn btn-o" onclick="closeAddAdmin()">Cancel</button>
+   <button class="btn btn-p" onclick="saveAddAdmin()">Add Admin</button>
+  </div>
+ </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<script src="../assets/js/firebase-config.js"></script>
+<script>
+"use strict";
+
+/* ════════════════════════════════════════════
+   CMS VERSION & DEFAULT CONTENT
+   (mirrors cms.js so the admin always has the
+   same bootstrap data without depending on the
+   public script file)
+════════════════════════════════════════════ */
+var CMS_VER = 1;
+var MIGRATION_VER = 9; /* increment this to re-run migrateV8Fields() on the next admin login */
+
+var DEF = {
+  products: [
+    { order:0, name:"Titan Core",   price:"$1,290", desc:"Enterprise SaaS Framework.",   img:"assets/img/Titan%20Core.webp",   imgW:640,imgH:480, headline:"Industrial-Grade Infrastructure", body:"Master your infrastructure with a high-performance SaaS framework. Engineered for rapid scaling and absolute authority.", features:["SaaS Architecture","Rapid Scaling","Validated Core","High-Load Capacity"], downloadUrl:"" },
+    { order:1, name:"Quantum UI",   price:"$750",   desc:"Kinetic React Components.",     img:"assets/img/Quantum%20UI.webp",   imgW:640,imgH:480, headline:"Cinematic Interface Architecture", body:"Experience the next generation of interface design. A modular, lightning-fast component library built for cinematic web architectures.", features:["Modular Components","Next-Gen Design","Tailwind Native","Performance Optimized"], downloadUrl:"" },
+    { order:2, name:"SecureAuth X", price:"$490",   desc:"Zero-Knowledge Auth Suite.",    img:"assets/img/SecureAuth%20X.webp",imgW:640,imgH:480, headline:"Immutable Authentication Protocol", body:"Implement impenetrable security protocols. Advanced multi-layer authentication designed to safeguard high-value digital assets.", features:["Multi-Layer Auth","Zero-Latency Logic","Enterprise Encryption","Asset Guarding"], downloadUrl:"" },
+    { order:3, name:"Nebula AI",    price:"$2,999", desc:"Neural Integration Engine.",    img:"assets/img/Nebula%20AI.webp",   imgW:640,imgH:480, headline:"Neural Workflow Orchestration", body:"Leverage the power of neural processing. An intelligent engine designed to automate complex workflows with surgical precision.", features:["Neural Prompting","Workflow Automation","LLM Ready","High Precision"], downloadUrl:"" },
+    { order:4, name:"Apex CMS",     price:"$1,800", desc:"Headless Content Engine.",      img:"assets/img/Apex%20CMS.webp",    imgW:640,imgH:480, headline:"Engineering Digital Authority", body:"Dominate your content ecosystem. A streamlined management system built for high-frequency updates and enterprise-grade performance.", features:["Streamlined Management","Performance Focused","SEO Native","Content Sovereignty"], downloadUrl:"" },
+    { order:5, name:"Zenith ERP",   price:"$4,500", desc:"Global Logistics Logic.",       img:"assets/img/Zenith%20ERP.webp",  imgW:640,imgH:480, headline:"Command Center Operations", body:"The ultimate command center for business operations. Integrated resource planning that delivers total operational sovereignty.", features:["Resource Planning","Operational Sync","Real-Time Tracking","Sovereign Logistics"], downloadUrl:"" },
+    { order:6, name:"Vortex DB",    price:"$980",   desc:"Real-time Vector Database.",    img:"assets/img/Vortex%20DB.webp",   imgW:640,imgH:480, headline:"High-Velocity Data Stream", body:"High-velocity data management with zero latency. Engineered to handle massive datasets while maintaining peak structural integrity.", features:["Zero Latency","Massive Scalability","Structural Integrity","Edge Sync"], downloadUrl:"" },
+    { order:7, name:"Cipher Mesh",  price:"$1,100", desc:"P2P Encryption Layer.",         img:"assets/img/Cipher%20Mesh.webp", imgW:640,imgH:480, headline:"Encrypted Network Sovereignty", body:"Secure your digital borders with advanced encryption. Delivers seamless connectivity and impenetrable data sovereignty.", features:["Advanced Encryption","Seamless Connectivity","Mesh Protocol","Data Sovereignty"], downloadUrl:"" },
+  ],
+  faq: [
+    { order:0, q:"How is the code architecture and performance verified?", a:"Our technical integrity is paramount. This website has passed rigorous W3C Validation (HTML5 & CSS3) and is optimized for maximum Google PageSpeed scores.", emailLink:null },
+    { order:1, q:"What components are included in the acquisition package?", a:"Upon a successful transaction, you will receive a structured .ZIP Digital Archive containing: Optimized Core Source Code (HTML5, CSS3, JS), Operational Documentation (README) for implementation, and an Official License Certificate.", emailLink:null },
+    { order:2, q:"What are the legal restrictions of this license?", a:"This license is exclusive for personal use or client projects. RESELLING, redistributing, or broadcasting this asset as a standalone product on any marketplace is STRICTLY PROHIBITED.", emailLink:null },
+    { order:3, q:"How secure is my financial data during the transaction?", a:"All payments are managed by Trusted Digital Marketplaces via global security infrastructure (SSL/TLS). We do not store or have access to your sensitive banking data.", emailLink:null },
+    { order:4, q:"Why is the initial procedure conducted via Email?", a:"We implement Email-Inquiry protocols to guarantee client privacy and prevent data exposure on public forms. This ensures a secure, private, and personal assistance path.", emailLink:null },
+    { order:5, q:"How can I contact technical support or the operator?", a:"We are committed to professional support. For specific asset inquiries or technical assistance, contact our operator directly at:", emailLink:true },
+  ],
+  about: { section_title:"The Architecture of Absolute Precision", section_subtitle:"VALIDATED CORE & EMPIRICAL PERFORMANCE", card1_title:"Zero-Error Technical Integrity", card1_body:"Elite Vault V8 is engineered for those who demand absolute stability. Every line of code has been meticulously audited to ensure a zero-error environment.", card2_title:"AI Cinematic Artistry", card2_body:"Menggabungkan kecerdasan buatan dengan estetika visual kelas atas. Kami membangun aset digital yang tidak hanya berfungsi secara teknis, tetapi juga menghadirkan pengalaman sinematik yang mendalam.", card3_title:"Sovereign Architecture", card3_body:"Setiap aset dirancang dengan prinsip kedaulatan digital. Memberikan kontrol penuh kepada pengguna melalui struktur kode yang bersih, modular, dan siap untuk skalabilitas industri masa depan.", card4_title:"Empirical Performance", card4_body:"Kecepatan adalah standar utama. Dengan optimasi tingkat tinggi pada setiap komponen, kami memastikan performa yang konsisten di berbagai perangkat, menjaga otoritas digital Anda tetap tanpa tanding." },
+  payments: {
+    local:   [{value:"BCA",label:"BCA — Bank Central Asia"},{value:"BRI",label:"BRI — Bank Rakyat Indonesia"},{value:"Mandiri",label:"Mandiri"},{value:"BNI",label:"BNI — Bank Negara Indonesia"},{value:"BSI",label:"BSI — Bank Syariah Indonesia"},{value:"CIMB",label:"CIMB Niaga"}],
+    intl:    [{value:"PayPal",label:"PayPal"},{value:"Visa",label:"Visa"},{value:"Mastercard",label:"Mastercard"},{value:"Wise",label:"Wise"},{value:"Stripe",label:"Stripe"},{value:"Skrill",label:"Skrill"}],
+    ewallet: [{value:"Dana",label:"Dana"},{value:"GoPay",label:"GoPay"},{value:"OVO",label:"OVO"},{value:"ShopeePay",label:"ShopeePay"},{value:"LinkAja",label:"LinkAja"},{value:"QRIS",label:"QRIS"}],
+  },
+  site: { siteName:"Elite Vault", tagline:"Architecting Digital Sovereignty.", heroDesc:"Industrial-grade software assets designed for absolute performance.", vaultTitle:"The Repository", vaultSubtitle:"CURATED ASSETS — DIGITAL MARKET", faqTitle:"Knowledge Base", faqSubtitle:"ACQUISITION PROTOCOLS & INTEL", email:"fransmarselinosroyer@gmail.com", logoUrl:"", faviconUrl:"", seoTitle:"Elite Vault v8.2.9 — Digital Market", seoDescription:"Elite Vault — Premium digital software assets marketplace. Industrial-grade software assets and AI Cinematic Artistry. Established 2026.", footerText:"© 2026 ELITE VAULT — ALL RIGHTS RESERVED", footerSocialLabel:"OFFICIAL CHANNELS", footerSocialTitle:"Connect With Elite Vault", footerSocialDescription:"Follow our official platforms for updates, announcements, and future releases.", instagramUrl:"", twitterUrl:"", linkedinUrl:"", backgroundImageUrl:"", backgroundVideoUrl:"", showcaseEnabled:true, showcaseEyebrow:"FEATURED COLLECTION", showcaseTitle:"Engineered for Excellence", showcaseSubtitle:"Industrial-grade digital assets crafted for absolute performance and modern scale.", showcaseBgImage:"", showcaseBgVideo:"", showcaseCard1Image:"", showcaseCard1Title:"Zero Latency", showcaseCard1Body:"Performance optimized at every architectural layer", showcaseCard2Image:"", showcaseCard2Title:"Secure by Default", showcaseCard2Body:"Enterprise-grade security embedded from the ground up", showcaseCard3Image:"", showcaseCard3Title:"Infinite Scale", showcaseCard3Body:"Architecture ready for any operational load", galleryEyebrow:"VISUAL ARCHIVE", galleryHeading:"Product Gallery", gallerySubtitle:"Explore our curated digital asset collection" },
+};
+
+/* ════════════════════════════════════════════
+   FIREBASE INIT
+════════════════════════════════════════════ */
+var cfg = window.FIREBASE_CONFIG;
+if (!cfg || cfg.apiKey === "YOUR_API_KEY") {
+  document.getElementById("auth-guard").innerHTML = '<div style="text-align:center;color:#888;max-width:300px;"><strong style="color:#fff;display:block;margin-bottom:8px;">Firebase not configured</strong>Edit <code>assets/js/firebase-config.js</code></div>';
+  throw new Error("Firebase not configured.");
+}
+
+try { firebase.initializeApp(cfg); } catch(e) { if (e.code !== "app/duplicate-app") throw e; }
+
+var auth = firebase.auth();
+var db   = firebase.firestore();
+
+/* ════════════════════════════════════════════
+   AUTH GUARD
+════════════════════════════════════════════ */
+/* ── SECURITY MANAGER: helper to open the CMS after auth passes ── */
+function _grantCMSAccess(user) {
+  document.getElementById("auth-guard").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  document.getElementById("user-em").textContent = user.email;
+  startCMS();
+}
+
+auth.onAuthStateChanged(function(user) {
+  if (!user) { window.location.replace("./index.html"); return; }
+
+  /* ── SECURITY MANAGER v8.2.9-SM1:
+     ADVANCED MODE: Custom Claim { admin:true } — original path, unchanged.
+     BASIC MODE:    admins/{uid} Firestore doc — no CLI / terminal required.
+     BOOTSTRAP:     system/security not yet written — show first-time setup.
+     forceRefresh=true so a freshly-set claim is honoured immediately,
+     and a revoked claim is caught on the next dashboard load. ── */
+  user.getIdTokenResult(/* forceRefresh= */ true).then(function(result) {
+
+    if (result.claims.admin === true) {
+      /* ── Advanced Mode or auto-migrated: Custom Claim present ── */
+      _grantCMSAccess(user);
+      return;
+    }
+
+    /* ── Basic Mode: check Firestore admins collection ── */
+    db.collection("admins").doc(user.uid).get().then(function(adminDoc) {
+      if (adminDoc.exists) {
+        _grantCMSAccess(user);
+        return;
+      }
+
+      /* ── Neither path matched — check initialization state ── */
+      db.collection("system").doc("security").get().then(function(secDoc) {
+        if (!secDoc.exists) {
+          /* First-time setup: no admins configured yet.
+             Show the dashboard shell + Security panel bootstrap wizard.
+             loadAllPanels() is intentionally NOT called here — the user
+             is not yet an admin and Firestore writes would be denied.
+             secBootstrap() calls loadAllPanels() after initialization. */
+          document.getElementById("auth-guard").style.display = "none";
+          document.getElementById("app").style.display = "block";
+          document.getElementById("user-em").textContent = user.email;
+          sw("security");
+          loadSecurity();
+        } else {
+          /* System is initialized but this account is not an admin */
+          document.getElementById("auth-guard").innerHTML =
+            "<div style='text-align:center;color:#888;max-width:320px;'>" +
+            "<strong style='color:#ff4d4d;display:block;margin-bottom:8px;'>Access Denied</strong>" +
+            "This account does not have administrator privileges.</div>";
+          setTimeout(function() { auth.signOut(); }, 2200);
+        }
+      }).catch(function() { auth.signOut(); });
+
+    }).catch(function() { auth.signOut(); });
+
+  }).catch(function() {
+    /* Token fetch failed — fail closed */
+    auth.signOut();
+  });
+});
+
+document.getElementById("logout-btn").addEventListener("click", function() {
+  auth.signOut().then(function() { window.location.replace("./index.html"); });
+});
+
+/* ════════════════════════════════════════════
+   CMS INITIALIZATION (admin side)
+   Same sentinel-based approach as cms.js.
+   Ensures seed runs once before loading panels.
+════════════════════════════════════════════ */
+function startCMS() {
+  var sysRef = db.collection("system").doc("cms");
+
+  sysRef.get().then(function(snap) {
+    if (snap.exists) {
+      var d = snap.data();
+      console.log("[CMS Admin] Initialized v" + (d.version||"?") + " — loading data.");
+      if (!d.migrationVer || d.migrationVer < MIGRATION_VER) {
+        try { migrateV8Fields(sysRef); } catch(err) { console.warn("[CMS] Migration error:", err); }
+      }
+      loadAllPanels();
+      return;
+    }
+
+    /* First run — seed everything, then load panels */
+    console.log("[CMS Admin] First run — seeding Firestore…");
+    seedFirestore().then(function() {
+      return sysRef.set({ initialized:true, version:CMS_VER, initializedAt:firebase.firestore.FieldValue.serverTimestamp() });
+    }).then(function() {
+      console.log("[CMS Admin] Seed complete.");
+      loadAllPanels();
+    }).catch(function(e) {
+      console.error("[CMS Admin] Seed failed.", e);
+      /* Load panels anyway with fallback hydration */
+      loadAllPanels();
+    });
+  }).catch(function(e) {
+    console.error("[CMS Admin] system/cms read failed.", e);
+    loadAllPanels();
+  });
+}
+
+/* ── Migration: write default values for fields added after initial seed ──
+   Idempotent: only writes when the field is missing (=== undefined).
+   Never overwrites an existing value, even empty string. ── */
+function migrateV8Fields(sysRef) {
+  var ps = [];
+
+  ps.push(db.collection("settings").doc("about").get().then(function(doc) {
+    if (!doc.exists) return;
+    var patch = {};
+    if (doc.data().section_title    === undefined) patch.section_title    = DEF.about.section_title;
+    if (doc.data().section_subtitle === undefined) patch.section_subtitle = DEF.about.section_subtitle;
+    if (Object.keys(patch).length > 0) {
+      db.collection("settings").doc("about").set(patch, { merge: true }).catch(function() {});
+    }
+  }).catch(function() {}));
+
+  ps.push(db.collection("settings").doc("site").get().then(function(doc) {
+    if (!doc.exists) return;
+    var patch = {};
+    if (doc.data().faqTitle      === undefined) patch.faqTitle      = DEF.site.faqTitle;
+    if (doc.data().faqSubtitle   === undefined) patch.faqSubtitle   = DEF.site.faqSubtitle;
+    if (doc.data().vaultTitle    === undefined) patch.vaultTitle    = DEF.site.vaultTitle;
+    if (doc.data().vaultSubtitle === undefined) patch.vaultSubtitle = DEF.site.vaultSubtitle;
+    if (doc.data().heroDesc      === undefined) patch.heroDesc      = DEF.site.heroDesc;
+    if (doc.data().backgroundImageUrl === undefined) patch.backgroundImageUrl = DEF.site.backgroundImageUrl;
+    if (doc.data().backgroundVideoUrl === undefined) patch.backgroundVideoUrl = DEF.site.backgroundVideoUrl;
+    if (doc.data().showcaseEnabled  === undefined) patch.showcaseEnabled  = DEF.site.showcaseEnabled;
+    if (doc.data().showcaseEyebrow  === undefined) patch.showcaseEyebrow  = DEF.site.showcaseEyebrow;
+    if (doc.data().showcaseTitle    === undefined) patch.showcaseTitle    = DEF.site.showcaseTitle;
+    if (doc.data().showcaseSubtitle === undefined) patch.showcaseSubtitle = DEF.site.showcaseSubtitle;
+    if (doc.data().showcaseBgImage  === undefined) patch.showcaseBgImage  = DEF.site.showcaseBgImage;
+    if (doc.data().showcaseBgVideo  === undefined) patch.showcaseBgVideo  = DEF.site.showcaseBgVideo;
+    if (doc.data().showcaseCard1Image === undefined) patch.showcaseCard1Image = DEF.site.showcaseCard1Image;
+    if (doc.data().showcaseCard1Title === undefined) patch.showcaseCard1Title = DEF.site.showcaseCard1Title;
+    if (doc.data().showcaseCard1Body  === undefined) patch.showcaseCard1Body  = DEF.site.showcaseCard1Body;
+    if (doc.data().showcaseCard2Image === undefined) patch.showcaseCard2Image = DEF.site.showcaseCard2Image;
+    if (doc.data().showcaseCard2Title === undefined) patch.showcaseCard2Title = DEF.site.showcaseCard2Title;
+    if (doc.data().showcaseCard2Body  === undefined) patch.showcaseCard2Body  = DEF.site.showcaseCard2Body;
+    if (doc.data().showcaseCard3Image === undefined) patch.showcaseCard3Image = DEF.site.showcaseCard3Image;
+    if (doc.data().showcaseCard3Title === undefined) patch.showcaseCard3Title = DEF.site.showcaseCard3Title;
+    if (doc.data().showcaseCard3Body  === undefined) patch.showcaseCard3Body  = DEF.site.showcaseCard3Body;
+    if (doc.data().galleryEyebrow   === undefined) patch.galleryEyebrow   = DEF.site.galleryEyebrow;
+    if (doc.data().galleryHeading   === undefined) patch.galleryHeading   = DEF.site.galleryHeading;
+    if (doc.data().gallerySubtitle  === undefined) patch.gallerySubtitle  = DEF.site.gallerySubtitle;
+    if (Object.keys(patch).length > 0) {
+      db.collection("settings").doc("site").set(patch, { merge: true }).catch(function() {});
+    }
+  }).catch(function() {}));
+
+  /* Migrate products: add downloadUrl:"" where field is missing (PATCH 8) */
+  ps.push(db.collection("products").get().then(function(snap) {
+    snap.forEach(function(doc) {
+      if (doc.data().downloadUrl === undefined) {
+        doc.ref.set({ downloadUrl: "" }, { merge: true }).catch(function() {});
+      }
+    });
+  }).catch(function() {}));
+
+  /* Stamp migrationVer so this block is skipped on the next login */
+  Promise.all(ps).then(function() {
+    if (sysRef) sysRef.update({ migrationVer: MIGRATION_VER }).catch(function() {});
+  });
+}
+
+function seedFirestore() {
+  var batch = db.batch();
+
+  DEF.products.forEach(function(p) { batch.set(db.collection("products").doc(), p); });
+  DEF.faq.forEach(function(f)      { batch.set(db.collection("faq").doc(), f); });
+  batch.set(db.collection("settings").doc("about"),   DEF.about);
+  batch.set(db.collection("payments").doc("methods"), DEF.payments);
+  batch.set(db.collection("settings").doc("site"),    DEF.site);
+
+  return batch.commit();
+}
+
+function loadAllPanels() {
+  loadProducts();
+  loadFAQ();
+  loadAbout();
+  loadPayments();
+  loadSettings();
+  try { loadGallery(); }   catch(err) { console.warn("[CMS] Gallery panel error:", err); }
+  try { loadSecurity(); }  catch(err) { console.warn("[CMS] Security panel error:", err); }
+}
+
+/* ════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════ */
+var TITLES = { dashboard:"Dashboard", products:"Products", about:"About", faq:"FAQ", payments:"Payments", contact:"Contact", settings:"Settings", gallery:"Gallery", security:"Security" };
+
+document.querySelectorAll(".nav-btn[data-panel]").forEach(function(b) {
+  b.addEventListener("click", function() { sw(this.dataset.panel); document.getElementById("sb").classList.remove("open"); });
+});
+document.getElementById("sb-toggle").addEventListener("click", function() { document.getElementById("sb").classList.toggle("open"); });
+
+function sw(name) {
+  document.querySelectorAll(".panel").forEach(function(p) { p.classList.remove("active"); });
+  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
+  var p = document.getElementById("panel-"+name);
+  if (p) p.classList.add("active");
+  var b = document.querySelector(".nav-btn[data-panel='"+name+"']");
+  if (b) b.classList.add("active");
+  document.getElementById("topbar-title").textContent = TITLES[name] || name;
+}
+
+/* ════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════ */
+var _tt = null;
+function toast(msg, type) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className   = "show " + (type || "ok");
+  clearTimeout(_tt);
+  _tt = setTimeout(function() { t.className = ""; }, 3200);
+}
+
+/* ════════════════════════════════════════════
+   XSS HELPER
+════════════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+/* ════════════════════════════════════════════
+   HELPER: set field value safely
+   Uses !== undefined check (not falsy) so
+   empty strings can clear previous values.
+════════════════════════════════════════════ */
+function setField(id, val) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (val !== undefined && val !== null) el.value = val;
+}
+
+/* ════════════════════════════════════════════
+   PRODUCTS
+════════════════════════════════════════════ */
+var prodCache = [];
+
+function loadProducts() {
+  db.collection("products").orderBy("order").get()
+    .then(function(snap) {
+      prodCache = [];
+      snap.forEach(function(doc) { prodCache.push(Object.assign({ id:doc.id }, doc.data())); });
+      if (!prodCache.length) { hydrateProds(); } else { renderProdTable(); }
+      document.getElementById("s-products").textContent = prodCache.length || DEF.products.length;
+    })
+    .catch(function(e) { toast("Error loading products: "+e.message, "err"); });
+}
+
+function hydrateProds() {
+  prodCache = DEF.products.map(function(p,i) { return Object.assign({ id:"_def_"+i }, p); });
+  renderProdTable();
+}
+
+function renderProdTable() {
+  var tb = document.getElementById("prod-tb");
+  if (!prodCache.length) {
+    tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="empty-i">📦</div>No products yet.</div></td></tr>';
+    return;
+  }
+  tb.innerHTML = prodCache.map(function(p) {
+    return '<tr>'+
+      '<td><strong>'+esc(p.name||"")+' </strong>'+(p.downloadUrl?'<span class="badge bg-g" style="margin-left:6px;font-size:0.62rem;vertical-align:middle;padding:2px 7px;">&#10003; File</span>':'<span class="badge" style="margin-left:6px;font-size:0.62rem;vertical-align:middle;padding:2px 7px;background:rgba(255,255,255,0.05);color:var(--dim);">&#9888; No File</span>')+'</td>'+
+      '<td><span class="badge bg-g">'+esc(p.price||"")+'</span></td>'+
+      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);">'+esc(p.desc||"")+'</td>'+
+      '<td>'+(p.order||0)+'</td>'+
+      '<td><div class="acts">'+
+        '<button class="btn btn-o btn-sm" onclick="editProd(\''+p.id+'\')">Edit</button>'+
+        '<button class="btn btn-d btn-sm" onclick="delProd(\''+p.id+'\')">Delete</button>'+
+      '</div></td></tr>';
+  }).join("");
+}
+
+function openProd(id) {
+  ["pm-id","pm-name","pm-price","pm-desc","pm-img","pm-dl-url","pm-hl","pm-body","pm-feat"].forEach(function(i) { setField(i,""); });
+  setField("pm-ord","0");
+  document.getElementById("pm-id").value = id || "";
+  document.getElementById("pm-title").textContent = id ? "Edit Product" : "Add Product";
+
+  if (id) {
+    var p = prodCache.find(function(x) { return x.id === id; });
+    if (p) {
+      setField("pm-name",  p.name);
+      setField("pm-price", p.price);
+      setField("pm-desc",  p.desc);
+      setField("pm-img",   p.img);
+      setField("pm-ord",   p.order !== undefined ? String(p.order) : "0");
+      setField("pm-hl",    p.headline);
+      setField("pm-body",  p.body);
+      setField("pm-feat",  Array.isArray(p.features) ? p.features.join("\n") : "");
+      setField("pm-dl-url", p.downloadUrl || "");
+    }
+  }
+  document.getElementById("prod-modal").classList.add("open");
+}
+function editProd(id) { openProd(id); }
+function closeProd()  { document.getElementById("prod-modal").classList.remove("open"); }
+
+function saveProd() {
+  var btn   = document.getElementById("pm-save");
+  var docId = document.getElementById("pm-id").value.trim();
+  var name  = document.getElementById("pm-name").value.trim();
+  var price = document.getElementById("pm-price").value.trim();
+  var desc  = document.getElementById("pm-desc").value.trim();
+  var img   = document.getElementById("pm-img").value.trim();
+  var order = parseInt(document.getElementById("pm-ord").value) || 0;
+  var hl    = document.getElementById("pm-hl").value.trim();
+  var body  = document.getElementById("pm-body").value.trim();
+  var feat  = document.getElementById("pm-feat").value.split("\n").map(function(s){return s.trim();}).filter(Boolean);
+  var dlUrl = document.getElementById("pm-dl-url").value.trim();
+
+  if (!name || !price) { toast("Name and price required.", "err"); return; }
+  if (dlUrl && _isValidUrl(dlUrl)) { toast("Download URL harus berupa Storage path (gs:// atau relative path), bukan https:// URL.", "err"); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Saving…';
+
+  var data = { name:name, price:price, desc:desc, img:img, order:order, headline:hl, body:body, features:feat, imgW:640, imgH:480, downloadUrl:dlUrl };
+
+  /* If this was a fallback entry (id starts with _def_), always add as new doc */
+  var isNew = !docId || docId.startsWith("_def_");
+  var op = isNew
+    ? db.collection("products").add(data)
+    : db.collection("products").doc(docId).set(data, { merge:true });
+
+  op.then(function() {
+    toast("Product saved.", "ok");
+    closeProd();
+    loadProducts();
+  }).catch(function(e) { toast("Save failed: "+e.message, "err"); })
+    .finally(function() { btn.disabled=false; btn.textContent="Save Product"; });
+}
+
+function delProd(id) {
+  if (id.startsWith("_def_")) { toast("Save to Firestore first before deleting.", "err"); return; }
+  if (!confirm("Delete this product?")) return;
+  db.collection("products").doc(id).delete()
+    .then(function() { toast("Deleted.", "ok"); loadProducts(); })
+    .catch(function(e) { toast("Delete failed: "+e.message, "err"); });
+}
+
+/* ════════════════════════════════════════════
+   FAQ
+════════════════════════════════════════════ */
+var faqCache = [];
+
+function loadFAQ() {
+  db.collection("faq").orderBy("order").get()
+    .then(function(snap) {
+      faqCache = [];
+      snap.forEach(function(doc) { faqCache.push(Object.assign({ id:doc.id }, doc.data())); });
+      if (!faqCache.length) { hydrateFAQ(); } else { renderFAQTable(); }
+      document.getElementById("s-faq").textContent = faqCache.length || DEF.faq.length;
+    })
+    .catch(function(e) { toast("Error loading FAQ: "+e.message, "err"); });
+}
+
+function hydrateFAQ() {
+  faqCache = DEF.faq.map(function(f,i) { return Object.assign({ id:"_def_"+i }, f); });
+  renderFAQTable();
+}
+
+function renderFAQTable() {
+  var tb = document.getElementById("faq-tb");
+  if (!faqCache.length) { tb.innerHTML='<tr><td colspan="4"><div class="empty"><div class="empty-i">◎</div>No FAQ entries.</div></td></tr>'; return; }
+  tb.innerHTML = faqCache.map(function(f) {
+    var preview = (f.a||"").substring(0,60) + ((f.a||"").length>60 ? "…":"");
+    return '<tr>'+
+      '<td style="max-width:200px;">'+esc(f.q||"")+'</td>'+
+      '<td style="color:var(--dim);max-width:180px;">'+esc(preview)+'</td>'+
+      '<td>'+(f.order||0)+'</td>'+
+      '<td><div class="acts">'+
+        '<button class="btn btn-o btn-sm" onclick="editFAQEntry(\''+f.id+'\')">Edit</button>'+
+        '<button class="btn btn-d btn-sm" onclick="delFAQ(\''+f.id+'\')">Delete</button>'+
+      '</div></td></tr>';
+  }).join("");
+}
+
+function openFAQ(id) {
+  setField("fm-q",""); setField("fm-a",""); setField("fm-ord","0");
+  document.getElementById("fm-el").checked = false;
+  document.getElementById("fm-id").value   = id || "";
+  document.getElementById("fm-title").textContent = id ? "Edit FAQ" : "Add FAQ";
+  if (id) {
+    var f = faqCache.find(function(x) { return x.id===id; });
+    if (f) { setField("fm-q",f.q); setField("fm-a",f.a); setField("fm-ord",String(f.order||0)); document.getElementById("fm-el").checked=!!f.emailLink; }
+  }
+  document.getElementById("faq-modal").classList.add("open");
+}
+function editFAQEntry(id) { openFAQ(id); }
+function closeFAQ() { document.getElementById("faq-modal").classList.remove("open"); }
+
+function saveFAQEntry() {
+  var btn   = document.getElementById("fm-save");
+  var docId = document.getElementById("fm-id").value.trim();
+  var q     = document.getElementById("fm-q").value.trim();
+  var a     = document.getElementById("fm-a").value.trim();
+  var order = parseInt(document.getElementById("fm-ord").value) || 0;
+  var el    = document.getElementById("fm-el").checked ? true : null;
+
+  if (!q||!a) { toast("Question and answer required.", "err"); return; }
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Saving…';
+
+  var data = { q:q, a:a, order:order, emailLink:el };
+  var isNew = !docId || docId.startsWith("_def_");
+  var op = isNew ? db.collection("faq").add(data) : db.collection("faq").doc(docId).set(data,{merge:true});
+
+  op.then(function() { toast("FAQ saved.", "ok"); closeFAQ(); loadFAQ(); })
+    .catch(function(e) { toast("Save failed: "+e.message, "err"); })
+    .finally(function() { btn.disabled=false; btn.textContent="Save Entry"; });
+}
+
+function delFAQ(id) {
+  if (id.startsWith("_def_")) { toast("Save to Firestore first.", "err"); return; }
+  if (!confirm("Delete FAQ entry?")) return;
+  db.collection("faq").doc(id).delete()
+    .then(function() { toast("Deleted.", "ok"); loadFAQ(); })
+    .catch(function(e) { toast("Delete failed: "+e.message, "err"); });
+}
+
+/* ════════════════════════════════════════════
+   ABOUT
+════════════════════════════════════════════ */
+function loadAbout() {
+  db.collection("settings").doc("about").get()
+    .then(function(doc) {
+      var d = doc.exists ? doc.data() : DEF.about;
+      setField("a-stitle", d.section_title || DEF.about.section_title);
+      setField("a-ssub",   d.section_subtitle || DEF.about.section_subtitle);
+      for (var i=1;i<=4;i++) {
+        setField("a"+i+"t", d["card"+i+"_title"]);
+        setField("a"+i+"b", d["card"+i+"_body"]);
+      }
+    }).catch(function() {
+      /* Fallback on error */
+      setField("a-stitle", DEF.about.section_title);
+      setField("a-ssub",   DEF.about.section_subtitle);
+      for (var i=1;i<=4;i++) {
+        setField("a"+i+"t", DEF.about["card"+i+"_title"]);
+        setField("a"+i+"b", DEF.about["card"+i+"_body"]);
+      }
+    });
+}
+
+function saveAbout() {
+  var data = {};
+  var stitle = document.getElementById("a-stitle");
+  if (stitle && stitle.value.trim()) data["section_title"] = stitle.value.trim();
+  var ssub = document.getElementById("a-ssub");
+  if (ssub && ssub.value.trim()) data["section_subtitle"] = ssub.value.trim();
+  for (var i=1;i<=4;i++) {
+    var t=document.getElementById("a"+i+"t"), b=document.getElementById("a"+i+"b");
+    data["card"+i+"_title"] = t ? t.value : "";
+    data["card"+i+"_body"]  = b ? b.value : "";
+  }
+  db.collection("settings").doc("about").set(data,{merge:true})
+    .then(function() { toast("About saved.", "ok"); })
+    .catch(function(e) { toast("Save failed: "+e.message, "err"); });
+}
+
+/* ════════════════════════════════════════════
+   PAYMENTS v2
+════════════════════════════════════════════ */
+var _pmMethods = [];
+
+/* Dynamic field definitions per payment type */
+var _PM_TPL = {
+  bank:      [{id:"pf-f1",label:"Bank Name",         t:"text",  ph:"BCA, BRI, Mandiri…",      k:"bankName"},
+              {id:"pf-f2",label:"Account Number",     t:"text",  ph:"1234567890",              k:"accountNumber"},
+              {id:"pf-f3",label:"Account Holder",     t:"text",  ph:"Full name on account",    k:"accountHolder"},
+              {id:"pf-f4",label:"Instructions (opt)", t:"area",  ph:"Transfer steps…",         k:"instructions"}],
+  paypal:    [{id:"pf-f1",label:"PayPal Email",       t:"email", ph:"paypal@email.com",        k:"paypalEmail"},
+              {id:"pf-f2",label:"Checkout URL (opt)", t:"url",   ph:"https://paypal.me/…",     k:"checkoutUrl"},
+              {id:"pf-f3",label:"Merchant Name",      t:"text",  ph:"Your business name",      k:"merchantName"},
+              {id:"pf-f4",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  qris:      [{id:"pf-f1",label:"QR Code Image URL",  t:"url",   ph:"https://…/qr.png",       k:"qrImageUrl"},
+              {id:"pf-f2",label:"Merchant Name",      t:"text",  ph:"Merchant Name",           k:"merchantName"},
+              {id:"pf-f3",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  barcode:   [{id:"pf-f1",label:"Barcode Image URL",  t:"url",   ph:"https://…/barcode.png",  k:"barcodeImageUrl"},
+              {id:"pf-f2",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  dana:      [{id:"pf-f1",label:"Dana Number",        t:"text",  ph:"08xxxx",                  k:"number"},
+              {id:"pf-f2",label:"Account Name",       t:"text",  ph:"Name on Dana",            k:"accountName"}],
+  ovo:       [{id:"pf-f1",label:"OVO Number",         t:"text",  ph:"08xxxx",                  k:"number"},
+              {id:"pf-f2",label:"Account Name",       t:"text",  ph:"Name on OVO",             k:"accountName"}],
+  gopay:     [{id:"pf-f1",label:"GoPay Number",       t:"text",  ph:"08xxxx",                  k:"number"},
+              {id:"pf-f2",label:"Account Name",       t:"text",  ph:"Name on GoPay",           k:"accountName"}],
+  shopeepay: [{id:"pf-f1",label:"ShopeePay Number",   t:"text",  ph:"08xxxx",                  k:"number"},
+              {id:"pf-f2",label:"Account Name",       t:"text",  ph:"Name on ShopeePay",       k:"accountName"}],
+  linkaja:   [{id:"pf-f1",label:"LinkAja Number",     t:"text",  ph:"08xxxx",                  k:"number"},
+              {id:"pf-f2",label:"Account Name",       t:"text",  ph:"Name on LinkAja",         k:"accountName"}],
+  wise:      [{id:"pf-f1",label:"Wise Email",         t:"email", ph:"wise@email.com",          k:"wiseEmail"},
+              {id:"pf-f2",label:"Profile URL (opt)",  t:"url",   ph:"https://wise.com/…",      k:"accountUrl"},
+              {id:"pf-f3",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  payoneer:  [{id:"pf-f1",label:"Payoneer Email",     t:"email", ph:"payoneer@email.com",      k:"payoneerEmail"},
+              {id:"pf-f2",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  stripe:    [{id:"pf-f1",label:"Stripe Checkout URL",t:"url",   ph:"https://buy.stripe.com/…",k:"checkoutUrl"},
+              {id:"pf-f2",label:"Instructions (opt)", t:"area",  ph:"",                        k:"instructions"}],
+  custom:    [{id:"pf-f1",label:"Destination / ID",   t:"text",  ph:"Account / ID / Number",   k:"destination"},
+              {id:"pf-f2",label:"Title / Label",      t:"text",  ph:"e.g. Bitcoin Address",    k:"customTitle"},
+              {id:"pf-f3",label:"Instructions",       t:"area",  ph:"Payment steps…",          k:"instructions"}],
+};
+
+function loadPayments() {
+  db.collection("payments").doc("methods").get()
+    .then(function(doc) {
+      var d = doc.exists ? doc.data() : {};
+
+      if (d.methods && Array.isArray(d.methods) && d.methods.length > 0) {
+        /* New schema */
+        _pmMethods = d.methods;
+      } else if (d.local || d.intl || d.ewallet) {
+        /* Legacy schema — convert to new format for display & edit */
+        _pmMethods = [];
+        [{key:"local",cat:"local"},{key:"intl",cat:"intl"},{key:"ewallet",cat:"ewallet"}].forEach(function(c) {
+          (d[c.key]||[]).forEach(function(m, i) {
+            _pmMethods.push({ id:"legacy_"+c.cat+"_"+i, displayName:m.label||m.value,
+              category:c.cat, type:"custom", active:true, sortOrder:i,
+              destination:m.value, customTitle:m.label });
+          });
+        });
+      } else {
+        _pmMethods = [];
+      }
+
+      _renderPMTable();
+      document.getElementById("s-payments").textContent =
+        _pmMethods.filter(function(m){return m.active!==false;}).length;
+    })
+    .catch(function() { _pmMethods = []; _renderPMTable(); });
+}
+
+function _renderPMTable() {
+  var tbody = document.getElementById("pm-tbody");
+  var empty = document.getElementById("pm-empty");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!_pmMethods.length) {
+    if (empty) empty.style.display = "block";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  var catLbl = {local:"Bank Lokal", intl:"International", ewallet:"E-Wallet"};
+
+  _pmMethods
+    .slice().sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);})
+    .forEach(function(m) {
+      var tr = document.createElement("tr");
+
+      /* Name */
+      var tdN = document.createElement("td");
+      var st  = document.createElement("strong");
+      st.textContent = m.displayName || "—";
+      tdN.appendChild(st);
+
+      /* Category */
+      var tdC = document.createElement("td");
+      tdC.textContent = catLbl[m.category] || m.category || "—";
+
+      /* Type */
+      var tdT = document.createElement("td");
+      tdT.style.cssText = "font-size:.78rem;opacity:.65;";
+      tdT.textContent = m.type || "—";
+
+      /* Status */
+      var tdS   = document.createElement("td");
+      var badge = document.createElement("span");
+      badge.className = "badge" + (m.active !== false ? " bg-g" : "");
+      badge.textContent = m.active !== false ? "Active" : "Inactive";
+      tdS.appendChild(badge);
+
+      /* Actions — event listeners, no inline onclick */
+      var tdA  = document.createElement("td");
+      var acts = document.createElement("div");
+      acts.className = "acts";
+
+      var editBtn = document.createElement("button");
+      editBtn.className  = "btn btn-o btn-sm";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", (function(id){ return function(){ openPMForm(id); }; }(m.id)));
+
+      var delBtn = document.createElement("button");
+      delBtn.className  = "btn btn-d btn-sm";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", (function(id){ return function(){ deletePMMethod(id); }; }(m.id)));
+
+      acts.appendChild(editBtn);
+      acts.appendChild(delBtn);
+      tdA.appendChild(acts);
+
+      tr.appendChild(tdN); tr.appendChild(tdC); tr.appendChild(tdT);
+      tr.appendChild(tdS); tr.appendChild(tdA);
+      tbody.appendChild(tr);
+    });
+}
+
+function renderPFDynamic() {
+  var type = document.getElementById("pf-type").value;
+  var el   = document.getElementById("pf-dynamic");
+  if (!el) return;
+  var fields = _PM_TPL[type] || [];
+  el.innerHTML = fields.map(function(f) {
+    return f.t==="area"
+      ? "<div class='fg'><label>"+f.label+"</label><textarea id='"+f.id+"' placeholder='"+esc(f.ph)+"'></textarea></div>"
+      : "<div class='fg'><label>"+f.label+"</label><input id='"+f.id+"' type='"+f.t+"' placeholder='"+esc(f.ph)+"'></div>";
+  }).join("");
+}
+
+function renderPFMode() {
+  var isAuto = document.getElementById("pf-mode-auto");
+  var block  = document.getElementById("pf-gateway-block");
+  if (block) block.style.display = (isAuto && isAuto.checked) ? "" : "none";
+}
+
+function openPMForm(id) {
+  setField("pf-id",""); setField("pf-name",""); setField("pf-order","0");
+  document.getElementById("pf-cat").value    = "local";
+  document.getElementById("pf-type").value   = "bank";
+  document.getElementById("pf-active").value = "true";
+  /* Reset payment mode to Manual (default for new methods) */
+  var pfModeReset = document.getElementById("pf-mode-manual");
+  if (pfModeReset) pfModeReset.checked = true;
+  renderPFDynamic();
+  renderPFMode();
+  document.getElementById("pf-modal-title").textContent = id ? "Edit Payment Method" : "Add Payment Method";
+
+  if (id) {
+    var m = _pmMethods.find(function(x){return x.id===id;});
+    if (m) {
+      setField("pf-id", m.id);
+      setField("pf-name", m.displayName);
+      setField("pf-order", String(m.sortOrder||0));
+      document.getElementById("pf-cat").value    = m.category  || "local";
+      document.getElementById("pf-type").value   = m.type      || "bank";
+      document.getElementById("pf-active").value = m.active===false ? "false" : "true";
+      renderPFDynamic();
+      /* Populate type-specific fields */
+      (_PM_TPL[m.type]||[]).forEach(function(f){
+        var fe = document.getElementById(f.id);
+        if (fe && m[f.k] !== undefined) fe.value = m[f.k];
+      });
+      /* Populate payment mode + gateway fields */
+      var modeEl = document.getElementById("pf-mode-" + (m.paymentMode === "automatic" ? "auto" : "manual"));
+      if (modeEl) modeEl.checked = true;
+      var pfGwEl  = document.getElementById("pf-gateway");
+      if (pfGwEl)  pfGwEl.value  = m.gatewayId          || "";
+      var pfGwUrl = document.getElementById("pf-gateway-url");
+      if (pfGwUrl) pfGwUrl.value = m.gatewayEndpointUrl || "";
+      renderPFMode();
+    }
+  }
+  document.getElementById("pf-modal").classList.add("open");
+}
+
+function closePMForm() {
+  document.getElementById("pf-modal").classList.remove("open");
+}
+
+function savePMMethod() {
+  var name = document.getElementById("pf-name").value.trim();
+  if (!name) { toast("Display name is required.", "err"); return; }
+
+  var type = document.getElementById("pf-type").value;
+
+  /* URL validation per type — required URL fields must be valid https:// */
+  var urlMap = {
+    paypal:    {req:[], opt:["pf-f2"]},          /* pf-f2 = checkoutUrl (optional)  */
+    qris:      {req:["pf-f1"], opt:[]},           /* pf-f1 = qrImageUrl (required)   */
+    barcode:   {req:["pf-f1"], opt:[]},           /* pf-f1 = barcodeImageUrl         */
+    wise:      {req:[], opt:["pf-f2"]},           /* pf-f2 = accountUrl (optional)   */
+    stripe:    {req:["pf-f1"], opt:[]},           /* pf-f1 = checkoutUrl (required)  */
+  };
+  var vc = urlMap[type];
+  if (vc) {
+    for (var ri = 0; ri < vc.req.length; ri++) {
+      var rel = document.getElementById(vc.req[ri]);
+      if (rel && !_isValidUrl(rel.value.trim())) {
+        toast("A valid HTTPS URL is required for this field.", "err"); return;
+      }
+    }
+    for (var oi = 0; oi < vc.opt.length; oi++) {
+      var oel = document.getElementById(vc.opt[oi]);
+      if (oel && oel.value.trim() && !_isValidUrl(oel.value.trim())) {
+        toast("Invalid URL — must start with https://", "err"); return;
+      }
+    }
+  }
+  var id     = document.getElementById("pf-id").value.trim() || ("pm_"+Date.now());
+  var type   = document.getElementById("pf-type").value;
+  var cat    = document.getElementById("pf-cat").value;
+  var order  = parseInt(document.getElementById("pf-order").value)||0;
+  var active = document.getElementById("pf-active").value !== "false";
+
+  /* Collect type-specific fields */
+  var extra = {};
+  (_PM_TPL[type]||[]).forEach(function(f){
+    var fe = document.getElementById(f.id);
+    extra[f.k] = fe ? fe.value.trim() : "";
+  });
+
+  var method = Object.assign({id:id, displayName:name, category:cat, type:type, sortOrder:order, active:active}, extra);
+
+  /* Persist payment mode and gateway configuration (auto-payment extension) */
+  var pfModeAuto = document.getElementById("pf-mode-auto");
+  method.paymentMode = (pfModeAuto && pfModeAuto.checked) ? "automatic" : "manual";
+  if (method.paymentMode === "automatic") {
+    var pfGwEl    = document.getElementById("pf-gateway");
+    var pfGwUrlEl = document.getElementById("pf-gateway-url");
+    method.gatewayId          = pfGwEl    ? pfGwEl.value.trim()    : "";
+    var rawGwUrl              = pfGwUrlEl ? pfGwUrlEl.value.trim()  : "";
+    method.gatewayEndpointUrl = _isValidUrl(rawGwUrl) ? rawGwUrl   : "";
+  }
+
+  var idx = _pmMethods.findIndex(function(m){return m.id===id;});
+  if (idx>=0) { _pmMethods[idx] = method; } else { _pmMethods.push(method); }
+
+  _savePMToFirestore();
+  closePMForm();
+}
+
+function deletePMMethod(id) {
+  if (!confirm("Delete this payment method?")) return;
+  _pmMethods = _pmMethods.filter(function(m){return m.id!==id;});
+  _savePMToFirestore();
+}
+
+function _savePMToFirestore() {
+  /* Write new schema + legacy compat arrays simultaneously */
+  var active = _pmMethods.filter(function(m){return m.active!==false;})
+                         .sort(function(a,b){return(a.sortOrder||0)-(b.sortOrder||0);});
+  var toLegacy = function(cat) {
+    return active.filter(function(m){return m.category===cat;})
+                 .map(function(m){return{value:m.id, label:m.displayName};});
+  };
+  db.collection("payments").doc("methods").set({
+    methods: _pmMethods,
+    local:   toLegacy("local"),
+    intl:    toLegacy("intl"),
+    ewallet: toLegacy("ewallet"),
+  }).then(function() {
+    toast("Payment methods saved.", "ok");
+    _renderPMTable();
+    document.getElementById("s-payments").textContent = active.length;
+  }).catch(function(e){ toast("Save failed: "+e.message, "err"); });
+}
+
+/* Stubs — keep for any external code that may reference old functions */
+function savePM() { _savePMToFirestore(); }
+function parsePM() { return []; }
+
+/* ════════════════════════════════════════════
+   SETTINGS + CONTACT
+   (both read/write to settings/site)
+════════════════════════════════════════════ */
+function loadSettings() {
+  db.collection("settings").doc("site").get()
+    .then(function(doc) {
+      var d = doc.exists ? doc.data() : DEF.site;
+      setField("s-name",  d.siteName);
+      setField("s-email", d.email);
+      setField("s-logo",  d.logoUrl);
+      setField("s-fav",   d.faviconUrl);
+      setField("s-tag",   d.tagline);
+      setField("s-hero-desc", d.heroDesc || DEF.site.heroDesc);
+      setField("s-faqt",       d.faqTitle       || DEF.site.faqTitle);
+      setField("s-faqsub",     d.faqSubtitle    || DEF.site.faqSubtitle);
+      setField("s-vault-title",d.vaultTitle     || DEF.site.vaultTitle);
+      setField("s-vault-sub",  d.vaultSubtitle  || DEF.site.vaultSubtitle);
+      setField("s-bg-img",     d.backgroundImageUrl || "");
+      setField("s-bg-vid",     d.backgroundVideoUrl || "");
+      /* Showcase */
+      var scEnabledEl = document.getElementById("s-sc-enabled"); if (scEnabledEl) scEnabledEl.checked = (d.showcaseEnabled !== false);
+      setField("s-sc-eyebrow", d.showcaseEyebrow  || DEF.site.showcaseEyebrow);
+      setField("s-sc-title",   d.showcaseTitle    || DEF.site.showcaseTitle);
+      setField("s-sc-sub",     d.showcaseSubtitle || DEF.site.showcaseSubtitle);
+      setField("s-sc-img",     d.showcaseBgImage  || "");
+      setField("s-sc-vid",     d.showcaseBgVideo  || "");
+      setField("s-sc-c1-img",   d.showcaseCard1Image || "");
+      setField("s-sc-c1-title", d.showcaseCard1Title || DEF.site.showcaseCard1Title);
+      setField("s-sc-c1-body",  d.showcaseCard1Body  || DEF.site.showcaseCard1Body);
+      setField("s-sc-c2-img",   d.showcaseCard2Image || "");
+      setField("s-sc-c2-title", d.showcaseCard2Title || DEF.site.showcaseCard2Title);
+      setField("s-sc-c2-body",  d.showcaseCard2Body  || DEF.site.showcaseCard2Body);
+      setField("s-sc-c3-img",   d.showcaseCard3Image || "");
+      setField("s-sc-c3-title", d.showcaseCard3Title || DEF.site.showcaseCard3Title);
+      setField("s-sc-c3-body",  d.showcaseCard3Body  || DEF.site.showcaseCard3Body);
+      setField("s-gl-eyebrow", d.galleryEyebrow  || DEF.site.galleryEyebrow);
+      setField("s-gl-heading", d.galleryHeading   || DEF.site.galleryHeading);
+      setField("s-gl-sub",     d.gallerySubtitle  || DEF.site.gallerySubtitle);
+      setField("s-seot",  d.seoTitle);
+      setField("s-seod",  d.seoDescription);
+      setField("s-foot",  d.footerText);
+      setField("s-fsl",   d.footerSocialLabel       || DEF.site.footerSocialLabel);
+      setField("s-fst",   d.footerSocialTitle        || DEF.site.footerSocialTitle);
+      setField("s-fsd",   d.footerSocialDescription  || DEF.site.footerSocialDescription);
+      setField("s-ig",    d.instagramUrl);
+      setField("s-tw",    d.twitterUrl);
+      setField("s-li",    d.linkedinUrl);
+      /* Mirror to Contact panel */
+      setField("c-email", d.email);
+      setField("c-ig",    d.instagramUrl);
+      setField("c-tw",    d.twitterUrl);
+      setField("c-li",    d.linkedinUrl);
+    }).catch(function() {
+      /* Fallback on error */
+      var s = DEF.site;
+      setField("s-name",  s.siteName); setField("s-email",s.email); setField("s-logo",s.logoUrl);
+      setField("s-fav",   s.faviconUrl); setField("s-tag",s.tagline); setField("s-hero-desc",s.heroDesc); setField("s-faqt",s.faqTitle); setField("s-vault-title",s.vaultTitle); setField("s-vault-sub",s.vaultSubtitle); setField("s-bg-img",""); setField("s-bg-vid",""); setField("s-seot",s.seoTitle);
+      setField("s-seod",  s.seoDescription); setField("s-foot",s.footerText);
+      setField("s-fsl",s.footerSocialLabel); setField("s-fst",s.footerSocialTitle); setField("s-fsd",s.footerSocialDescription);
+      setField("s-ig",s.instagramUrl); setField("s-tw",s.twitterUrl); setField("s-li",s.linkedinUrl);
+      var scFbEl = document.getElementById("s-sc-enabled"); if (scFbEl) scFbEl.checked = true;
+      setField("s-sc-eyebrow", s.showcaseEyebrow); setField("s-sc-title", s.showcaseTitle); setField("s-sc-sub", s.showcaseSubtitle); setField("s-sc-img",""); setField("s-sc-vid","");
+      setField("s-sc-c1-img",""); setField("s-sc-c1-title", s.showcaseCard1Title); setField("s-sc-c1-body", s.showcaseCard1Body);
+      setField("s-sc-c2-img",""); setField("s-sc-c2-title", s.showcaseCard2Title); setField("s-sc-c2-body", s.showcaseCard2Body);
+      setField("s-sc-c3-img",""); setField("s-sc-c3-title", s.showcaseCard3Title); setField("s-sc-c3-body", s.showcaseCard3Body);
+      setField("s-gl-eyebrow", s.galleryEyebrow); setField("s-gl-heading", s.galleryHeading); setField("s-gl-sub", s.gallerySubtitle);
+      setField("c-email",s.email); setField("c-ig",s.instagramUrl); setField("c-tw",s.twitterUrl); setField("c-li",s.linkedinUrl);
+    });
+}
+
+/* ── URL & Email Validators (dipakai oleh saveSettings) ── */
+function _isValidUrl(val) {
+  if (!val) return true; /* kosong = boleh */
+  try {
+    var u = new URL(String(val).trim());
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch (e) { return false; }
+}
+function _isValidEmail(val) {
+  if (!val) return true; /* kosong = boleh */
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(val).trim());
+}
+
+function saveSettings() {
+  var emailVal  = document.getElementById("s-email").value.trim();
+  var logoVal   = document.getElementById("s-logo").value.trim();
+  var favVal    = document.getElementById("s-fav").value.trim();
+  var igVal     = document.getElementById("s-ig").value.trim();
+  var twVal     = document.getElementById("s-tw").value.trim();
+  var liVal     = document.getElementById("s-li").value.trim();
+  var bgImgVal  = document.getElementById("s-bg-img") ? document.getElementById("s-bg-img").value.trim() : "";
+  var bgVidVal  = document.getElementById("s-bg-vid") ? document.getElementById("s-bg-vid").value.trim() : "";
+  var scImgVal  = document.getElementById("s-sc-img") ? document.getElementById("s-sc-img").value.trim() : "";
+  var scVidVal  = document.getElementById("s-sc-vid") ? document.getElementById("s-sc-vid").value.trim() : "";
+  var scC1ImgVal = document.getElementById("s-sc-c1-img") ? document.getElementById("s-sc-c1-img").value.trim() : "";
+  var scC2ImgVal = document.getElementById("s-sc-c2-img") ? document.getElementById("s-sc-c2-img").value.trim() : "";
+  var scC3ImgVal = document.getElementById("s-sc-c3-img") ? document.getElementById("s-sc-c3-img").value.trim() : "";
+
+  /* Validate email */
+  if (!_isValidEmail(emailVal)) {
+    toast("Email tidak valid — harus format user@domain.com", "err");
+    return;
+  }
+
+  /* Validate URL fields — hanya http:// atau https:// yang diterima */
+  var urlChecks = [
+    { val: logoVal,   label: "Logo URL"              },
+    { val: favVal,    label: "Favicon URL"           },
+    { val: igVal,     label: "Instagram URL"         },
+    { val: twVal,     label: "Twitter URL"           },
+    { val: liVal,     label: "LinkedIn URL"          },
+    { val: bgImgVal,  label: "Background Image URL"  },
+    { val: bgVidVal,  label: "Background Video URL"  },
+    { val: scImgVal,   label: "Showcase Background Image URL" },
+    { val: scVidVal,   label: "Showcase Background Video URL" },
+    { val: scC1ImgVal, label: "Showcase Card 1 Image URL" },
+    { val: scC2ImgVal, label: "Showcase Card 2 Image URL" },
+    { val: scC3ImgVal, label: "Showcase Card 3 Image URL" },
+  ];
+  var badUrls = urlChecks.filter(function(f) { return !_isValidUrl(f.val); });
+  if (badUrls.length > 0) {
+    toast("URL tidak valid (wajib http:// atau https://): " + badUrls.map(function(f) { return f.label; }).join(", "), "err");
+    return;
+  }
+
+  var data = {
+    siteName:       document.getElementById("s-name").value,
+    email:          emailVal,
+    logoUrl:        logoVal,
+    faviconUrl:     favVal,
+    tagline:        document.getElementById("s-tag").value,
+    heroDesc:       document.getElementById("s-hero-desc") ? document.getElementById("s-hero-desc").value : DEF.site.heroDesc,
+    faqTitle:       document.getElementById("s-faqt").value,
+    faqSubtitle:    document.getElementById("s-faqsub")    ? document.getElementById("s-faqsub").value    : DEF.site.faqSubtitle,
+    vaultTitle:     document.getElementById("s-vault-title") ? document.getElementById("s-vault-title").value : DEF.site.vaultTitle,
+    vaultSubtitle:  document.getElementById("s-vault-sub")   ? document.getElementById("s-vault-sub").value   : DEF.site.vaultSubtitle,
+    seoTitle:       document.getElementById("s-seot").value,
+    seoDescription: document.getElementById("s-seod").value,
+    footerText:              document.getElementById("s-foot").value,
+    footerSocialLabel:       document.getElementById("s-fsl") ? document.getElementById("s-fsl").value : DEF.site.footerSocialLabel,
+    footerSocialTitle:       document.getElementById("s-fst") ? document.getElementById("s-fst").value : DEF.site.footerSocialTitle,
+    footerSocialDescription: document.getElementById("s-fsd") ? document.getElementById("s-fsd").value : DEF.site.footerSocialDescription,
+    instagramUrl:   igVal,
+    twitterUrl:     twVal,
+    linkedinUrl:    liVal,
+    backgroundImageUrl: bgImgVal,
+    backgroundVideoUrl: bgVidVal,
+    showcaseEnabled:  document.getElementById("s-sc-enabled")  ? document.getElementById("s-sc-enabled").checked  : true,
+    showcaseEyebrow:  document.getElementById("s-sc-eyebrow")  ? document.getElementById("s-sc-eyebrow").value   : DEF.site.showcaseEyebrow,
+    showcaseTitle:    document.getElementById("s-sc-title")    ? document.getElementById("s-sc-title").value     : DEF.site.showcaseTitle,
+    showcaseSubtitle: document.getElementById("s-sc-sub")      ? document.getElementById("s-sc-sub").value       : DEF.site.showcaseSubtitle,
+    showcaseBgImage:  scImgVal,
+    showcaseBgVideo:  scVidVal,
+    showcaseCard1Image: scC1ImgVal,
+    showcaseCard1Title: document.getElementById("s-sc-c1-title") ? document.getElementById("s-sc-c1-title").value : DEF.site.showcaseCard1Title,
+    showcaseCard1Body:  document.getElementById("s-sc-c1-body")  ? document.getElementById("s-sc-c1-body").value  : DEF.site.showcaseCard1Body,
+    showcaseCard2Image: scC2ImgVal,
+    showcaseCard2Title: document.getElementById("s-sc-c2-title") ? document.getElementById("s-sc-c2-title").value : DEF.site.showcaseCard2Title,
+    showcaseCard2Body:  document.getElementById("s-sc-c2-body")  ? document.getElementById("s-sc-c2-body").value  : DEF.site.showcaseCard2Body,
+    showcaseCard3Image: scC3ImgVal,
+    showcaseCard3Title: document.getElementById("s-sc-c3-title") ? document.getElementById("s-sc-c3-title").value : DEF.site.showcaseCard3Title,
+    showcaseCard3Body:  document.getElementById("s-sc-c3-body")  ? document.getElementById("s-sc-c3-body").value  : DEF.site.showcaseCard3Body,
+    galleryEyebrow:   document.getElementById("s-gl-eyebrow")  ? document.getElementById("s-gl-eyebrow").value  : DEF.site.galleryEyebrow,
+    galleryHeading:   document.getElementById("s-gl-heading")  ? document.getElementById("s-gl-heading").value  : DEF.site.galleryHeading,
+    gallerySubtitle:  document.getElementById("s-gl-sub")      ? document.getElementById("s-gl-sub").value      : DEF.site.gallerySubtitle,
+  };
+  db.collection("settings").doc("site").set(data, { merge:true })
+    .then(function() { toast("Settings saved.", "ok"); syncContactFromSettings(data); })
+    .catch(function(e) { toast("Save failed: "+e.message, "err"); });
+}
+
+function saveContact() {
+  var emailVal = document.getElementById("c-email").value.trim();
+  var igVal    = document.getElementById("c-ig").value.trim();
+  var twVal    = document.getElementById("c-tw").value.trim();
+  var liVal    = document.getElementById("c-li").value.trim();
+
+  /* Validate email menggunakan helper yang sudah ada */
+  if (!_isValidEmail(emailVal)) {
+    toast("Email tidak valid — harus format user@domain.com", "err");
+    return;
+  }
+
+  /* Validate URL fields menggunakan helper yang sudah ada */
+  var urlChecks = [
+    { val: igVal, label: "Instagram URL" },
+    { val: twVal, label: "Twitter URL"   },
+    { val: liVal, label: "LinkedIn URL"  },
+  ];
+  var badUrls = urlChecks.filter(function(f) { return !_isValidUrl(f.val); });
+  if (badUrls.length > 0) {
+    toast("URL tidak valid (wajib http:// atau https://): " + badUrls.map(function(f) { return f.label; }).join(", "), "err");
+    return;
+  }
+
+  var data = {
+    email:        emailVal,
+    instagramUrl: igVal,
+    twitterUrl:   twVal,
+    linkedinUrl:  liVal,
+  };
+  db.collection("settings").doc("site").set(data, { merge:true })
+    .then(function() { toast("Contact saved.", "ok"); syncSettingsFromContact(data); })
+    .catch(function(e) { toast("Save failed: "+e.message, "err"); });
+}
+
+/* Keep Settings and Contact panels in sync */
+function syncContactFromSettings(d) {
+  setField("c-email", d.email);
+  setField("c-ig",    d.instagramUrl);
+  setField("c-tw",    d.twitterUrl);
+  setField("c-li",    d.linkedinUrl);
+}
+function syncSettingsFromContact(d) {
+  setField("s-email", d.email);
+  setField("s-ig",    d.instagramUrl);
+  setField("s-tw",    d.twitterUrl);
+  setField("s-li",    d.linkedinUrl);
+}
+
+/* ════════════════════════════════════════════
+   GALLERY
+════════════════════════════════════════════ */
+var galleryCache = [];
+
+function loadGallery() {
+  try {
+    db.collection("gallery").orderBy("order").get()
+      .then(function(snap) {
+        galleryCache = [];
+        snap.forEach(function(doc) { galleryCache.push(Object.assign({ id:doc.id }, doc.data())); });
+        try { renderGalleryTable(); } catch(err) { console.warn("[CMS] renderGalleryTable:", err); }
+      })
+      .catch(function(e) { console.warn("[CMS] Gallery load:", e.message); });
+  } catch(err) { console.warn("[CMS] loadGallery error:", err); }
+}
+
+function renderGalleryTable() {
+  try {
+  var tb = document.getElementById("gallery-tb");
+  if (!tb) return;
+  if (!galleryCache.length) {
+    tb.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="empty-i">&#128444;</div>No gallery images yet — click + Add Image.</div></td></tr>';
+    return;
+  }
+  tb.innerHTML = galleryCache.map(function(g) {
+    var pre = g.url
+      ? '<img src="' + esc(g.url) + '" alt="' + esc(g.alt || "") + '" style="width:60px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">'
+      : '<div style="width:60px;height:40px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;opacity:.4;font-size:.7rem;">—</div>';
+    return '<tr>' +
+      '<td>' + pre + '</td>' +
+      '<td style="color:var(--dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(g.alt || "—") + '</td>' +
+      '<td>' + (g.order || 0) + '</td>' +
+      '<td><div class="acts">' +
+        '<button class="btn btn-o btn-sm" onclick="editGalleryItem(\'' + g.id + '\')">Edit</button>' +
+        '<button class="btn btn-d btn-sm" onclick="delGalleryItem(\'' + g.id + '\')">Delete</button>' +
+      '</div></td></tr>';
+  }).join("");
+  } catch(err) { console.warn("[CMS] renderGalleryTable error:", err); }
+}
+
+function openGalleryItem(id) {
+  ["gm-id", "gm-url", "gm-alt"].forEach(function(i) { setField(i, ""); });
+  setField("gm-ord", "0");
+  var _gt = document.getElementById("gm-title");
+  if (_gt) _gt.textContent = id ? "Edit Image" : "Add Image";
+  if (id) {
+    var g = galleryCache.find(function(x) { return x.id === id; });
+    if (g) {
+      setField("gm-id",  g.id);
+      setField("gm-url", g.url);
+      setField("gm-alt", g.alt);
+      setField("gm-ord", g.order !== undefined ? String(g.order) : "0");
+    }
+  }
+  var _gmod = document.getElementById("gallery-modal");
+  if (_gmod) _gmod.classList.add("open");
+}
+function editGalleryItem(id) { openGalleryItem(id); }
+function closeGalleryItem() {
+  var _gmod = document.getElementById("gallery-modal");
+  if (_gmod) _gmod.classList.remove("open");
+}
+
+function saveGalleryItem() {
+  var btn   = document.getElementById("gm-save");
+  var docId = document.getElementById("gm-id").value.trim();
+  var url   = document.getElementById("gm-url").value.trim();
+  var alt   = document.getElementById("gm-alt").value.trim();
+  var order = parseInt(document.getElementById("gm-ord").value) || 0;
+
+  if (!url) { toast("Image URL is required.", "err"); return; }
+  if (!_isValidUrl(url)) { toast("Image URL must start with https:// or http://", "err"); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Saving…';
+
+  var data = { url: url, alt: alt, order: order };
+  var op = docId
+    ? db.collection("gallery").doc(docId).set(data, { merge: true })
+    : db.collection("gallery").add(data);
+
+  op.then(function() {
+    toast("Gallery image saved.", "ok");
+    closeGalleryItem();
+    loadGallery();
+  }).catch(function(e) { toast("Save failed: " + e.message, "err"); })
+    .finally(function() { btn.disabled = false; btn.textContent = "Save Image"; });
+}
+
+function delGalleryItem(id) {
+  if (!confirm("Delete this gallery image?")) return;
+  db.collection("gallery").doc(id).delete()
+    .then(function() { toast("Deleted.", "ok"); loadGallery(); })
+    .catch(function(e) { toast("Delete failed: " + e.message, "err"); });
+}
+
+/* ════════════════════════════════════════════
+   MODAL UX
+════════════════════════════════════════════ */
+(function() {
+  try {
+    var _pm = document.getElementById("prod-modal");
+    if (_pm) _pm.addEventListener("click", function(e) { if(e.target===this) closeProd(); });
+    var _fm = document.getElementById("faq-modal");
+    if (_fm) _fm.addEventListener("click", function(e) { if(e.target===this) closeFAQ(); });
+    var _gm = document.getElementById("gallery-modal");
+    if (_gm) _gm.addEventListener("click", function(e) { if(e.target===this) closeGalleryItem(); });
+    document.addEventListener("keydown", function(e) {
+      if(e.key!=="Escape") return;
+      try { closeProd(); } catch(err) {}
+      try { closeFAQ(); } catch(err) {}
+      try { closeGalleryItem(); } catch(err) {}
+    });
+  } catch(err) { console.warn("[CMS] Modal UX setup error:", err); }
+}());
+
+
+/* ════════════════════════════════════════════════════════════════════
+   SECURITY MANAGER — v8.2.9-SM1
+   Provides two admin authorization paths:
+     BASIC MODE    → Firestore admins/{uid} collection (no CLI needed)
+     ADVANCED MODE → Firebase Custom Claims via setAdminClaim function
+   Manages mode switching, admin CRUD, and first-time bootstrap.
+   Does NOT touch any other CMS collection or existing panel logic.
+════════════════════════════════════════════════════════════════════ */
+
+var _secMode        = "basic";   // "basic" | "advanced"
+var _secInitialized = false;
+var _adminsCache    = [];
+
+/* ── helpers ─────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ── loadSecurity ────────────────────────────────────────────────── */
+// Entry point: called from loadAllPanels() for normal admins,
+// and directly from the auth guard bootstrap path.
+function loadSecurity() {
+  var user = auth.currentUser;
+  if (!user) return;
+
+  // Populate the account card (always safe — current user's own data)
+  document.getElementById("sec-uid").textContent       = user.uid;
+  document.getElementById("sec-email-disp").textContent = user.email || "";
+  document.getElementById("sec-boot-email").textContent = user.email || user.uid;
+
+  db.collection("system").doc("security").get().then(function(doc) {
+
+    if (!doc.exists) {
+      /* ── system/security not written yet ── */
+      user.getIdTokenResult().then(function(result) {
+        if (result.claims.admin === true) {
+          /* Existing installation being upgraded to Security Manager:
+             auto-initialize as Advanced Mode and add current user to
+             the admins collection so the Firestore rules recognise them. */
+          _autoInitSecurity(user, "advanced");
+        } else {
+          /* Brand-new installation: show bootstrap wizard */
+          document.getElementById("sec-bootstrap").style.display = "";
+          document.getElementById("sec-main").style.display      = "none";
+        }
+      }).catch(function() {
+        document.getElementById("sec-bootstrap").style.display = "";
+        document.getElementById("sec-main").style.display      = "none";
+      });
+      return;
+    }
+
+    /* ── Already initialized ── */
+    _secMode        = doc.data().mode || "basic";
+    _secInitialized = true;
+    document.getElementById("sec-bootstrap").style.display = "none";
+    document.getElementById("sec-main").style.display      = "";
+    _renderSecMode();
+    _loadAdmins();
+
+  }).catch(function(e) {
+    toast("Could not load security settings: " + e.message, "err");
+  });
+}
+
+/* ── _autoInitSecurity ───────────────────────────────────────────── */
+// Called when an existing Custom-Claim admin opens Security panel
+// for the first time. Silently creates system/security and their
+// admins/{uid} record without any prompt or disruption.
+function _autoInitSecurity(user, mode) {
+  db.collection("admins").doc(user.uid).set({
+    label:   user.email || user.uid,
+    email:   user.email || "",
+    addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    addedBy: "auto-migration"
+  }, { merge: true }).then(function() {
+    return db.collection("system").doc("security").set({
+      mode:          mode,
+      initialized:   true,
+      initializedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      migratedFrom:  "custom-claims"
+    });
+  }).then(function() {
+    _secMode        = mode;
+    _secInitialized = true;
+    document.getElementById("sec-bootstrap").style.display = "none";
+    document.getElementById("sec-main").style.display      = "";
+    _renderSecMode();
+    _loadAdmins();
+  }).catch(function(e) {
+    /* Auto-init failed — fall back to bootstrap wizard */
+    document.getElementById("sec-bootstrap").style.display = "";
+    document.getElementById("sec-main").style.display      = "none";
+    console.warn("[Security] Auto-init failed:", e.message);
+  });
+}
+
+/* ── secBootstrap ────────────────────────────────────────────────── */
+// Called by "Initialize Admin Access" button (first-time setup).
+// Writes admins/{uid} via the Firestore bootstrap rule, then writes
+// system/security (now allowed because isAdmin() is already true).
+function secBootstrap(btn) {
+  var user = auth.currentUser;
+  if (!user) return;
+  btn.disabled    = true;
+  btn.innerHTML   = "<span class=\"spin\" style=\"width:14px;height:14px;border-top-color:var(--primary);\"></span>&nbsp;Initializing…";
+
+  db.collection("admins").doc(user.uid).set({
+    label:   user.email || user.uid,
+    email:   user.email || "",
+    addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    addedBy: "bootstrap"
+  }).then(function() {
+    return db.collection("system").doc("security").set({
+      mode:          "basic",
+      initialized:   true,
+      initializedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).then(function() {
+    _secMode        = "basic";
+    _secInitialized = true;
+    btn.disabled    = false;
+    btn.textContent = "Initialize Admin Access";
+    toast("Admin access initialized. Welcome!", "ok");
+    document.getElementById("sec-bootstrap").style.display = "none";
+    document.getElementById("sec-main").style.display      = "";
+    _renderSecMode();
+    _loadAdmins();
+    /* Now load all CMS panels — user is a confirmed admin */
+    loadAllPanels();
+  }).catch(function(e) {
+    btn.disabled    = false;
+    btn.textContent = "Initialize Admin Access";
+    toast("Initialization failed: " + e.message, "err");
+  });
+}
+
+/* ── _renderSecMode ──────────────────────────────────────────────── */
+function _renderSecMode() {
+  var badge = document.getElementById("sec-mode-badge");
+  var desc  = document.getElementById("sec-mode-desc");
+  var btnA  = document.getElementById("sec-btn-adv");
+  var btnB  = document.getElementById("sec-btn-basic");
+  var info  = document.getElementById("sec-adv-info");
+
+  if (_secMode === "advanced") {
+    badge.innerHTML = "<span class=\"badge bg-g\" style=\"font-size:0.78rem;\">⚡ Advanced Mode</span>";
+    desc.innerHTML  =
+      "Admin access uses <strong style=\"color:var(--text)\">Firebase Custom Claims</strong> — " +
+      "server-signed tokens verified on every request. Requires the " +
+      "<code>setAdminClaim</code> Cloud Function to be deployed.<br><br>" +
+      "<strong style=\"color:var(--text)\">This is the current mode.</strong>";
+    btnA.style.display = "none";
+    btnB.style.display = "";
+    info.style.display = "none";
+  } else {
+    badge.innerHTML = "<span class=\"badge\" style=\"background:var(--surface2);color:var(--text);font-size:0.78rem;\">◎ Basic Mode</span>";
+    desc.innerHTML  =
+      "Admin access is verified against the <strong style=\"color:var(--text)\">Firestore admins collection</strong>. " +
+      "No Firebase CLI, terminal, or manual Custom Claims required — " +
+      "manage everything from this dashboard.<br><br>" +
+      "<strong style=\"color:var(--text)\">This is the current mode.</strong>";
+    btnA.style.display = "";
+    btnB.style.display = "none";
+    info.innerHTML =
+      "<strong style=\"color:var(--text)\">About Advanced Mode:</strong> Enables Firebase Custom Claims " +
+      "(<code>admin:true</code>) for all current admin accounts. Requires the " +
+      "<code>setAdminClaim</code> Cloud Function to be deployed in your Firebase project. " +
+      "Your current session is preserved — no re-login required.";
+    info.style.display = "";
+  }
+}
+
+/* ── secSetMode ──────────────────────────────────────────────────── */
+function secSetMode(mode) {
+  if (mode === _secMode) return;
+  if (mode === "advanced") {
+    _secEnableAdvanced();
+  } else {
+    db.collection("system").doc("security").update({ mode: "basic" }).then(function() {
+      _secMode = "basic";
+      toast("Switched to Basic Mode.", "ok");
+      _renderSecMode();
+    }).catch(function(e) { toast("Failed: " + e.message, "err"); });
+  }
+}
+
+/* ── _secEnableAdvanced ──────────────────────────────────────────── */
+// Grants Custom Claims to all current admins via setAdminClaim,
+// force-refreshes the current session token (no logout needed),
+// then records mode:"advanced" in system/security.
+function _secEnableAdvanced() {
+  var btn = document.getElementById("sec-btn-adv");
+  btn.disabled  = true;
+  btn.innerHTML = "<span class=\"spin\" style=\"width:14px;height:14px;border-top-color:#fff;\"></span>&nbsp;Enabling…";
+
+  var fn;
+  try { fn = firebase.functions().httpsCallable("setAdminClaim"); }
+  catch(e) {
+    _advBtn(btn);
+    toast("Firebase Functions SDK error: " + e.message, "err");
+    return;
+  }
+
+  var selfUid = auth.currentUser.uid;
+
+  /* Step 1: grant claim to current user */
+  fn({ uid: selfUid }).then(function() {
+    /* Step 2: silently refresh token — Custom Claim takes effect immediately */
+    return auth.currentUser.getIdToken(/* forceRefresh= */ true);
+  }).then(function() {
+    /* Step 3: grant claim to all other admins */
+    return db.collection("admins").get();
+  }).then(function(snap) {
+    var others = [];
+    snap.forEach(function(d) {
+      if (d.id !== selfUid) others.push(fn({ uid: d.id }));
+    });
+    return Promise.all(others);
+  }).then(function() {
+    /* Step 4: persist mode */
+    return db.collection("system").doc("security").update({ mode: "advanced" });
+  }).then(function() {
+    _secMode = "advanced";
+    _advBtn(btn);
+    toast("Advanced Mode enabled. Token refreshed — no re-login needed.", "ok");
+    _renderSecMode();
+  }).catch(function(e) {
+    _advBtn(btn);
+    toast(
+      "Could not enable Advanced Mode: " + e.message +
+      " — ensure setAdminClaim is deployed in your Firebase project.",
+      "err"
+    );
+  });
+}
+function _advBtn(btn) {
+  btn.disabled    = false;
+  btn.textContent = "Enable Advanced Mode";
+}
+
+/* ── Admin Management ─────────────────────────────────────────────── */
+function _loadAdmins() {
+  db.collection("admins").get().then(function(snap) {
+    _adminsCache = [];
+    snap.forEach(function(d) { _adminsCache.push(Object.assign({ id: d.id }, d.data())); });
+    _renderAdminTable();
+  }).catch(function(e) {
+    document.getElementById("admin-tb").innerHTML =
+      "<tr><td colspan=\"4\" style=\"color:var(--error);padding:20px;\">Error: " + esc(e.message) + "</td></tr>";
+  });
+}
+
+function _renderAdminTable() {
+  var tb   = document.getElementById("admin-tb");
+  var self = auth.currentUser;
+  if (!_adminsCache.length) {
+    tb.innerHTML = "<tr><td colspan=\"4\"><div class=\"empty\"><div class=\"empty-i\">⬡</div>No admins found.</div></td></tr>";
+    return;
+  }
+  tb.innerHTML = _adminsCache.map(function(a) {
+    var isSelf  = self && a.id === self.uid;
+    var addedAt = a.addedAt && a.addedAt.toDate ? a.addedAt.toDate().toLocaleDateString() : "—";
+    return "<tr>" +
+      "<td><code style=\"font-size:0.73rem;\">" + esc(a.id.slice(0,16)) + "…</code>" +
+        (isSelf ? " <span class=\"badge bg-g\" style=\"font-size:0.6rem;\">You</span>" : "") + "</td>" +
+      "<td style=\"font-size:0.82rem;\">" + esc(a.label || a.email || "—") + "</td>" +
+      "<td style=\"color:var(--dim);font-size:0.8rem;\">" + esc(addedAt) + "</td>" +
+      "<td><div class=\"acts\">" +
+        (isSelf
+          ? "<span style=\"color:var(--dim);font-size:0.78rem;\">Current session</span>"
+          : "<button class=\"btn btn-d btn-sm\" onclick=\"removeAdmin('" + esc(a.id) + "')\">Remove</button>") +
+      "</div></td></tr>";
+  }).join("");
+}
+
+function openAddAdmin()  {
+  document.getElementById("aa-uid").value   = "";
+  document.getElementById("aa-label").value = "";
+  document.getElementById("addadmin-modal").classList.add("open");
+}
+function closeAddAdmin() {
+  document.getElementById("addadmin-modal").classList.remove("open");
+}
+
+function saveAddAdmin() {
+  var uid   = document.getElementById("aa-uid").value.trim();
+  var label = document.getElementById("aa-label").value.trim();
+  if (!uid)         { toast("UID is required.", "err"); return; }
+  if (uid.length < 10) { toast("UID looks too short — paste the full Firebase UID.", "err"); return; }
+
+  var me = auth.currentUser;
+  db.collection("admins").doc(uid).set({
+    label:   label || uid,
+    email:   label || "",
+    addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    addedBy: me ? me.uid : "unknown"
+  }).then(function() {
+    closeAddAdmin();
+    toast("Admin added.", "ok");
+    _loadAdmins();
+    /* In Advanced Mode, also grant Custom Claim (best-effort) */
+    if (_secMode === "advanced") {
+      try {
+        firebase.functions().httpsCallable("setAdminClaim")({ uid: uid })
+          .catch(function(e) { console.warn("[Security] setAdminClaim for new admin:", e.message); });
+      } catch(e) {}
+    }
+  }).catch(function(e) { toast("Failed: " + e.message, "err"); });
+}
+
+function removeAdmin(uid) {
+  if (!uid) return;
+  if (!confirm("Remove admin access for\n" + uid + "?\n\nThey will lose dashboard access immediately.")) return;
+
+  db.collection("admins").doc(uid).delete().then(function() {
+    toast("Admin removed.", "ok");
+    _loadAdmins();
+    /* In Advanced Mode, also revoke Custom Claim (best-effort) */
+    if (_secMode === "advanced") {
+      try {
+        firebase.functions().httpsCallable("revokeAdminClaim")({ uid: uid })
+          .catch(function(e) { console.warn("[Security] revokeAdminClaim:", e.message); });
+      } catch(e) {}
+    }
+  }).catch(function(e) { toast("Failed: " + e.message, "err"); });
+}
+/* ── END SECURITY MANAGER ─────────────────────────────────────────── */
+
+</script>
+</body>
+</html>
